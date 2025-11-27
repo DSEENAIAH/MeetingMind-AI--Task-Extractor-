@@ -1,0 +1,28 @@
+# Docker Compose development override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: builder  # Use builder stage for dev
+    command: npm run dev
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/.env:/app/.env
+    environment:
+      - NODE_ENV=development
+
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    command: npm run dev
+    ports:
+      - "3000:3000"  # Vite dev server port
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/.env:/app/.env
