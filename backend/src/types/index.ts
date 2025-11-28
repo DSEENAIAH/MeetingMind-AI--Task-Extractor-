@@ -26,10 +26,12 @@ export interface ExtractedTask {
   inferred?: boolean; // Whether this task was implied/inferred vs explicitly stated
   sourceText?: string; // Original text that led to task extraction
   evidenceContext?: string; // Surrounding context used for inference
+  matchedUser?: UserProfile; // User matched from assignee name
 }
 
 export interface ExtractRequest {
   notes: string;
+  useMock?: boolean;
 }
 
 export interface ExtractResponse {
@@ -138,8 +140,54 @@ export interface ApiError {
 }
 
 // ============================================================================
-// Session Types
+// Database Types (Supabase)
 // ============================================================================
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  full_name: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+  email?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  members?: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  name: string;
+  role: string;
+  added_by: string;
+  added_at: string;
+  username?: string; // Joined from user_profiles
+}
+
+// ============================================================================
+// API Request/Response Types
+// ============================================================================
+
+export interface CreateTeamRequest {
+  name: string;
+  userId: string; // ID of creator
+}
+
+export interface AddMemberRequest {
+  userId: string; // User to add
+  role?: string;
+  addedBy: string; // User performing the action
+}
+
 
 declare module 'express-session' {
   interface SessionData {

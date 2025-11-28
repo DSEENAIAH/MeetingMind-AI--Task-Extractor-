@@ -40,6 +40,9 @@ import extractRoutes from './routes/extract.js';
 import createTasksRoutes from './routes/createTasks.js';
 import authRoutes from './routes/auth.js';
 import cliqRoutes from './routes/cliq.js';
+import teamsRoutes from './routes/teams.js';
+import usersRoutes from './routes/users.js';
+import tasksRoutes from './routes/tasks.js';
 
 // ============================================================================
 // Configuration
@@ -119,14 +122,14 @@ app.use(
  */
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     console.log(
       `[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`
     );
   });
-  
+
   next();
 });
 
@@ -156,6 +159,10 @@ app.use('/api/extract', extractRoutes);
 app.use('/api/create-tasks', createTasksRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/cliq', cliqRoutes);
+app.use('/api/teams', teamsRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/tasks', tasksRoutes);
+
 
 /**
  * 404 handler for unknown routes

@@ -30,6 +30,7 @@ const OFFICIAL_ROLES = [
 
 function Dashboard() {
   const { user } = useAuth();
+  console.log('Dashboard rendering, user:', user);
   const [userRole, setUserRole] = useState<'official' | 'worker'>('worker');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,14 +38,14 @@ function Dashboard() {
     if (user) {
       // Get role from user metadata
       const role = user.user_metadata?.role;
-      
+
       // Check if user has official role
       if (role && OFFICIAL_ROLES.includes(role)) {
         setUserRole('official');
       } else {
         setUserRole('worker');
       }
-      
+
       setIsLoading(false);
     }
   }, [user]);

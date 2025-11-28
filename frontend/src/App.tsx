@@ -17,10 +17,13 @@
 
 import { Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import PasteNotes from './pages/PasteNotes';
-import PreviewTasks from './pages/PreviewTasks';
+
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
+import Teams from './pages/Teams';
+import TeamDashboard from './pages/TeamDashboard';
+import ProfileSettings from './pages/ProfileSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './contexts/AuthContext';
 import { FiLogOut, FiUser } from 'react-icons/fi';
@@ -37,27 +40,27 @@ function App() {
   const handleSignOut = async () => {
     setIsLoggingOut(true);
     console.log('Sign out clicked');
-    
+
     try {
       // Set a timeout to force logout if Supabase takes too long
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), 3000)
       );
-      
+
       const signOutPromise = supabase.auth.signOut();
-      
+
       await Promise.race([signOutPromise, timeoutPromise]);
       console.log('Signed out successfully');
     } catch (error) {
       console.log('Sign out error or timeout:', error);
       // Continue anyway
     }
-    
+
     // Clear everything
     setUsername('');
     sessionStorage.clear();
     localStorage.clear();
-    
+
     // Force reload to login page
     window.location.href = '/login';
   };
@@ -72,13 +75,13 @@ function App() {
 
       console.log('Fetching username for user:', user.id);
       console.log('User metadata:', user.user_metadata);
-      
+
       // Use metadata directly (fallback since database query seems to hang)
-      const displayName = user.user_metadata?.full_name || 
-                         user.user_metadata?.name || 
-                         user.email?.split('@')[0] || 
-                         'User';
-      
+      const displayName = user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split('@')[0] ||
+        'User';
+
       console.log('Setting username to:', displayName);
       setUsername(displayName);
 
@@ -92,7 +95,7 @@ function App() {
           console.log('Database query completed');
           console.log('User profile data:', data);
           console.log('Query error:', error);
-          
+
           if (data && !error && data.full_name) {
             console.log('Updating to database name:', data.full_name);
             setUsername(data.full_name);
@@ -106,16 +109,22 @@ function App() {
     fetchUsername();
   }, [user]);
 
-  // Check if user is official (can see nav menu)
+  // Define role-based access
   const OFFICIAL_ROLES = [
     'ceo', 'cto', 'vp_engineering', 'director',
     'engineering_manager', 'product_manager', 'team_lead', 'hr_manager'
   ];
-  const isOfficial = user?.user_metadata?.role && OFFICIAL_ROLES.includes(user.user_metadata.role);
+  const userRole = user?.user_metadata?.role;
+  const isOfficial = userRole && OFFICIAL_ROLES.includes(userRole);
 
-  // If user is logged in and tries to access /login, redirect to home
+  // Role-based redirect logic
   if (user && location.pathname === '/login') {
-    return <Navigate to="/" replace />;
+    // Redirect based on role after login
+    if (isOfficial) {
+      return <Navigate to="/teams" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return (
@@ -127,55 +136,34 @@ function App() {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-8">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 bg-clip-text text-transparent">
-                  MeetingMind
                 </h1>
                 {/* Only show navigation for officials */}
                 {isOfficial && (
                   <nav className="flex space-x-4" role="navigation" aria-label="Main navigation">
                     <Link
-                      to="/"
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        location.pathname === '/'
-                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
+                      to="/teams"
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${location.pathname.startsWith('/teams')
+                        ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                        }`}
                     >
-                      Extract Tasks
+                      Teams
                     </Link>
-                    <Link
-                      to="/preview"
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        location.pathname === '/preview'
-                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      Preview
-                    </Link>
-                    <Link
-                      to="/dashboard"
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        location.pathname === '/dashboard'
-                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      Dashboard
-                    </Link>
+
                   </nav>
                 )}
               </div>
-              
+
               {/* User Menu - Profile Display and Sign Out */}
               <div className="flex items-center space-x-3">
-                {/* Profile Icon with Name */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200">
+                {/* Profile Icon with Name - Clickable Link */}
+                <Link to="/profile" className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors">
                   <FiUser className="w-5 h-5 text-gray-600" />
                   <span className="font-medium text-sm text-gray-700">
                     {username || 'Loading...'}
                   </span>
-                </div>
-                
+                </Link>
+
                 {/* Sign Out Button */}
                 <button
                   onClick={handleSignOut}
@@ -197,29 +185,62 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
-                <PasteNotes />
+                {isOfficial ? <Navigate to="/teams" replace /> : <Navigate to="/dashboard" replace />}
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/preview" 
+          <Route
+            path="/extract"
             element={
               <ProtectedRoute>
-                <PreviewTasks />
+                {isOfficial ? <PasteNotes /> : <Navigate to="/dashboard" replace />}
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/dashboard" 
+
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
+          />
+          <Route
+            path="/teams"
+            element={
+              <ProtectedRoute>
+                <Teams />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/dashboard"
+            element={
+              <ProtectedRoute>
+                <TeamDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams/:teamId/extract"
+            element={
+              <ProtectedRoute>
+                <PasteNotes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfileSettings />
+              </ProtectedRoute>
+            }
           />
         </Routes>
       </main>

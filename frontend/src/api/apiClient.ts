@@ -25,6 +25,7 @@ export interface ExtractedTask {
   assignee?: string;
   priority?: 'low' | 'medium' | 'high';
   dueDate?: string; // ISO 8601 format
+  matchedUser?: UserProfile;
 }
 
 export interface ExtractRequest {
@@ -54,6 +55,30 @@ export interface CreateTasksResponse {
     title: string;
     error: string;
   }[];
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  members: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  name: string;
+  role: string;
+  username?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  full_name: string;
+  role: string;
 }
 
 // ============================================================================
@@ -86,8 +111,9 @@ async function apiFetch<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Full API Error Data:', errorData);
       throw new Error(
-        errorData.message || `API error: ${response.status} ${response.statusText}`
+        errorData.message || errorData.error || `API error: ${response.status} ${response.statusText}`
       );
     }
 
@@ -117,20 +143,132 @@ export async function extractTasks(notes: string): Promise<ExtractResponse> {
 }
 
 /**
- * Create tasks in Zoho Projects
- * 
- * @param tasks - List of tasks to create
- * @param projectId - Optional Zoho project ID (uses default if not provided)
- * @returns Created task details with URLs
+ * Create tasks in database
  */
 export async function createTasks(
   tasks: ExtractedTask[],
-  projectId?: string
-): Promise<CreateTasksResponse> {
-  return apiFetch<CreateTasksResponse>('/create-tasks', {
+  teamId: string,
+  assignedBy: string
+): Promise<any> {
+  return apiFetch<any>('/tasks', {
     method: 'POST',
-    body: JSON.stringify({ tasks, projectId }),
+    body: JSON.stringify({ tasks, teamId, assignedBy }),
   });
+}
+
+/**
+ * Get tasks with filters
+ */
+/**
+ * Get tasks with filters
+ */
+export async function getTasks(filters: { userId?: string; teamId?: string; status?: string; deleted?: boolean }): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (filters.userId) params.append('userId', filters.userId);
+  if (filters.teamId) params.append('teamId', filters.teamId);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.deleted) params.append('deleted', 'true');
+
+  return apiFetch<any[]>(`/tasks?${params.toString()}`);
+}
+
+/**
+ * Update task status
+ */
+/**
+ * Update task status
+ */
+export async function updateTaskStatus(taskId: string, status: 'pending' | 'in-progress' | 'completed'): Promise<any> {
+  return apiFetch<any>(`/tasks/${taskId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+/**
+ * Update task details
+ */
+export async function updateTask(taskId: string, updates: any): Promise<any> {
+  return apiFetch<any>(`/tasks/${taskId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Delete a task
+ * @param taskId - ID of the task to delete
+ * @param force - If true, permanently delete the task. If false (default), soft delete.
+ */
+export async function deleteTask(taskId: string, force: boolean = false): Promise<void> {
+  const url = force ? `/tasks/${taskId}?force=true` : `/tasks/${taskId}`;
+  return apiFetch<void>(url, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Restore a soft-deleted task
+ */
+export async function restoreTask(taskId: string): Promise<any> {
+  return apiFetch<any>(`/tasks/${taskId}/restore`, {
+    method: 'PATCH',
+  });
+}
+
+/**
+ * Get team statistics
+ */
+export async function getTeamStats(teamId: string): Promise<any> {
+  return apiFetch<any>(`/tasks/stats?teamId=${teamId}`);
+}
+
+/**
+ * Get user's teams
+ */
+export async function getTeams(userId: string): Promise<Team[]> {
+  return apiFetch<Team[]>(`/teams?userId=${userId}`);
+}
+
+/**
+ * Create a new team
+ */
+export async function createTeam(name: string, userId: string): Promise<Team> {
+  return apiFetch<Team>('/teams', {
+    method: 'POST',
+    body: JSON.stringify({ name, userId }),
+  });
+}
+
+/**
+ * Add a member to a team
+ */
+export async function addTeamMember(
+  teamId: string,
+  userId: string,
+  addedBy: string,
+  role: string = 'Member'
+): Promise<TeamMember> {
+  return apiFetch<TeamMember>(`/teams/${teamId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ userId, addedBy, role }),
+  });
+}
+
+/**
+ * Remove a member from a team
+ */
+export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
+  return apiFetch<void>(`/teams/${teamId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Search users
+ */
+export async function searchUsers(query: string): Promise<UserProfile[]> {
+  return apiFetch<UserProfile[]>(`/users/search?q=${encodeURIComponent(query)}`);
 }
 
 /**
@@ -170,7 +308,7 @@ export async function checkAuthStatus(): Promise<boolean> {
 export function mockExtractTasks(notes: string): ExtractResponse {
   console.log('[Mock Extractor] Starting extraction, input length:', notes.length);
   const tasks: ExtractedTask[] = [];
-  
+
   // Filler patterns to ignore
   const FILLER_PATTERNS = [
     /^hi[,! ]?$/i, /^hello[,! ]?$/i, /^morning[,! ]?$/i, /^good morning/i,
@@ -178,7 +316,7 @@ export function mockExtractTasks(notes: string): ExtractResponse {
     /^all good/i, /^sounds good/i, /^no blockers/i, /^bye[,! ]?$/i,
     /^great[,! ]?$/i, /^perfect[,! ]?$/i, /^no issues/i, /^on track/i,
   ];
-  
+
   // Action indicators
   const ACTION_VERBS = [
     'finish', 'complete', 'start', 'begin', 'fix', 'prepare', 'push',
@@ -194,24 +332,24 @@ export function mockExtractTasks(notes: string): ExtractResponse {
       july: '07', aug: '08', august: '08', sep: '09', sept: '09', september: '09',
       oct: '10', october: '10', nov: '11', november: '11', dec: '12', december: '12'
     };
-    
+
     const md = text.match(/(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})/i);
     if (md) {
       const month = monthMap[md[1].toLowerCase()];
       const day = md[2].padStart(2, '0');
       return `${new Date().getFullYear()}-${month}-${day}`;
     }
-    
+
     if (/tomorrow/i.test(text)) {
       const d = new Date();
       d.setDate(d.getDate() + 1);
       return d.toISOString().split('T')[0];
     }
-    
+
     if (/today|eod|end of day/i.test(text)) {
       return new Date().toISOString().split('T')[0];
     }
-    
+
     return undefined;
   }
 
@@ -237,10 +375,10 @@ export function mockExtractTasks(notes: string): ExtractResponse {
     if (speakerMatch) {
       currentSpeaker = speakerMatch[1].trim();
       const content = speakerMatch[2].trim();
-      
+
       // Check if this speaker line contains a task commitment
       const lower = content.toLowerCase();
-      
+
       // Pattern: "I can/will do X" - speaker commits to task
       if (/^i\s+(can|will|'ll)\s+(.+)/i.test(content)) {
         const taskMatch = content.match(/^i\s+(?:can|will|'ll)\s+(.+)/i);
@@ -264,7 +402,7 @@ export function mockExtractTasks(notes: string): ExtractResponse {
       const taskDesc = canYouMatch[2];
       pushTask(taskDesc, { assignee, dueDate: extractDueDate(taskDesc) });
     }
-    
+
     // Pattern: "who's doing X" - indicates need for assignment
     const whosMatch = line.match(/who'?s\s+(doing|updating|handling)\s+(.+?)\?/i);
     if (whosMatch) {
@@ -272,14 +410,14 @@ export function mockExtractTasks(notes: string): ExtractResponse {
       const taskDesc = `${action} ${whosMatch[2]}`;
       pushTask(taskDesc, { dueDate: extractDueDate(taskDesc) });
     }
-    
+
     // Pattern: "we need X" - indicates required task
     const needMatch = line.match(/we\s+need\s+(.+?)\./i);
     if (needMatch) {
       const taskDesc = needMatch[1];
       pushTask(taskDesc, { dueDate: extractDueDate(taskDesc) });
     }
-    
+
     // Pattern: "Name to do X by Date"
     const taskMatch = line.match(/([A-Z][a-z]+)\s+to\s+(.+?)\s+by\s+(\w+)/i);
     if (taskMatch) {
@@ -296,7 +434,7 @@ export function mockExtractTasks(notes: string): ExtractResponse {
       const taskDesc = willMatch[2];
       pushTask(taskDesc, { assignee, dueDate: extractDueDate(taskDesc) });
     }
-    
+
     // Pattern: "Name needs to X"
     const needsMatch = line.match(/([A-Z][a-z]+)\s+needs?\s+to\s+(.+)/i);
     if (needsMatch) {
@@ -343,7 +481,7 @@ export function mockExtractTasks(notes: string): ExtractResponse {
     for (const bullet of bulletMatches) {
       const cleanBullet = bullet.replace(/^\s*[-*•]\s+/, '').trim();
       if (FILLER_PATTERNS.some(p => p.test(cleanBullet))) continue;
-      
+
       // Check if bullet contains assignment
       const assigneeMatch = cleanBullet.match(/([A-Z][a-z]+)\s+(?:to|will|needs?\s+to|should)\s+(.+)/i);
       if (assigneeMatch) {

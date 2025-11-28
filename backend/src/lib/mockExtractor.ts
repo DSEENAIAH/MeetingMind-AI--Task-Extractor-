@@ -27,31 +27,6 @@
 
 import type { ExtractedTask, ExtractResponse } from '../types/index.js';
 
-// ============================================================================
-// Task Indicators (keywords that suggest a task)
-// ============================================================================
-
-const TASK_INDICATORS = [
-  'todo',
-  'action',
-  'need to',
-  'needs to',
-  'should',
-  'must',
-  'will',
-  'task',
-  'deliverable',
-  'follow up',
-  'follow-up',
-  'finish',
-  'complete',
-  'work on',
-  'handle',
-  'take care',
-  'responsible for',
-  'assigned to',
-];
-
 // Filler / acknowledgement lines to ignore as tasks
 const FILLER_PATTERNS = [
   /^hi[,! ]?$/i,
@@ -342,7 +317,7 @@ export function extractTasksMock(notes: string): ExtractResponse {
             priority: detectPriority(line),
           };
 
-          const assignee = extractAssignee(line);
+          const assignee = extractAssignee(cleanedText);
           if (assignee) {
             task.assignee = assignee;
           }
@@ -427,7 +402,6 @@ export function extractTasksMock(notes: string): ExtractResponse {
   const hasTimestamps = /\d{2}:\d{2}:\d{2}/.test(notes);
   if (hasTimestamps || tasks.length <= 1) {
     let currentSpeaker: string | undefined;
-    const todayISO = new Date().toISOString().split('T')[0];
     const transcriptLines = notes.split('\n').map(l => l.trim()).filter(Boolean);
 
     const pushTask = (title: string, opts: { assignee?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => {
@@ -450,8 +424,6 @@ export function extractTasksMock(notes: string): ExtractResponse {
         const content = speakerMatch[2].trim();
         
         // Check if this speaker line contains a task commitment
-        const lower = content.toLowerCase();
-        
         // Pattern: "I can/will do X" - speaker commits to task
         if (/^i\s+(can|will|'ll)\s+(.+)/i.test(content)) {
           const taskMatch = content.match(/^i\s+(?:can|will|'ll)\s+(.+)/i);
@@ -466,8 +438,6 @@ export function extractTasksMock(notes: string): ExtractResponse {
       // Parse non-speaker lines (usually manager assigning tasks)
       const line = rawLine.replace(/[""]/g, '"').replace(/[']/g, "'");
       if (FILLER_PATTERNS.some(p => p.test(line))) continue;
-      const lower = line.toLowerCase();
-
       // Pattern: "Name, after X, can you Y" or "Name, can you Y"
       const canYouMatch = line.match(/([A-Z][a-z]+),\s+(?:after\s+[^,]+,\s+)?can\s+you\s+(.+?)\?/i);
       if (canYouMatch) {

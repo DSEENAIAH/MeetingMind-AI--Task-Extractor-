@@ -3,257 +3,286 @@
  * 
  * Purpose: Dashboard for developers, QA, and other team members
  * Features:
- * - View assigned tasks
+/**
+ * WorkersDashboard.tsx
+ * 
+ * Purpose: Dashboard for developers, QA, and other team members
+ * Features:
+ * - View assigned tasks in a clean, tabbed list view
  * - Mark tasks as complete
  * - See task details and deadlines
  */
 
-import { useState } from 'react';
-import { FiCheckCircle, FiCircle, FiClock, FiUser } from 'react-icons/fi';
-
-interface Task {
-  id: string;
-  description: string;
-  assignedBy: string;
-  assignedAt: Date;
-  status: 'pending' | 'in-progress' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-}
+import { useState, useEffect } from 'react';
+import { FiCheckCircle, FiCircle, FiClock, FiFilter, FiSearch, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
+import { getTasks, updateTaskStatus, deleteTask, updateTask } from '../api/apiClient';
+import EditTaskModal from '../components/EditTaskModal';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const WorkersDashboard = () => {
-  // Mock data - will be replaced with real data from Supabase
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      description: 'Update the database schema for user profiles',
-      assignedBy: 'John (Manager)',
-      assignedAt: new Date('2025-11-26T10:00:00'),
-      status: 'pending',
-      priority: 'high',
-    },
-    {
-      id: '2',
-      description: 'Review pull request for authentication module',
-      assignedBy: 'Sarah (Team Lead)',
-      assignedAt: new Date('2025-11-26T09:00:00'),
-      status: 'in-progress',
-      priority: 'medium',
-    },
-    {
-      id: '3',
-      description: 'Fix the login bug reported in issue #234',
-      assignedBy: 'Mike (Tech Lead)',
-      assignedAt: new Date('2025-11-25T14:00:00'),
-      status: 'completed',
-      priority: 'high',
-    },
-    {
-      id: '4',
-      description: 'Write unit tests for payment service',
-      assignedBy: 'John (Manager)',
-      assignedAt: new Date('2025-11-25T11:00:00'),
-      status: 'pending',
-      priority: 'low',
-    },
-  ]);
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'pending' | 'in-progress' | 'completed'>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
 
-  const [filter, setFilter] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
-  const handleStatusChange = (taskId: string, newStatus: Task['status']) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
-  };
+  // Fetch tasks for current user
+  useEffect(() => {
+    if (user) {
+      loadTasks();
+    }
+  }, [user]);
 
-  const filteredTasks = filter === 'all' 
-    ? tasks 
-    : tasks.filter(task => task.status === filter);
-
-  const pendingCount = tasks.filter(t => t.status === 'pending').length;
-  const inProgressCount = tasks.filter(t => t.status === 'in-progress').length;
-  const completedCount = tasks.filter(t => t.status === 'completed').length;
-
-  const getPriorityColor = (priority: Task['priority']) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
+  const loadTasks = async () => {
+    if (!user) return;
+    try {
+      const data = await getTasks({ userId: user.id });
+      setTasks(data);
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
     }
   };
 
-  const getStatusIcon = (status: Task['status']) => {
-    switch (status) {
-      case 'completed': return <FiCheckCircle className="text-green-500 w-5 h-5" />;
-      case 'in-progress': return <FiClock className="text-orange-500 w-5 h-5" />;
-      case 'pending': return <FiCircle className="text-gray-400 w-5 h-5" />;
+  const handleStatusChange = async (taskId: string, newStatus: 'pending' | 'in-progress' | 'completed') => {
+    try {
+      await updateTaskStatus(taskId, newStatus);
+      setTasks(tasks.map(task =>
+        task.id === taskId ? { ...task, status: newStatus } : task
+      ));
+    } catch (error) {
+      console.error('Failed to update status:', error);
     }
   };
 
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    return `${diffDays} days ago`;
+  const handleDeleteClick = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setIsDeleteModalOpen(true);
   };
+
+  const confirmDelete = async () => {
+    if (!taskToDelete) return;
+    try {
+      await deleteTask(taskToDelete);
+      setTasks(tasks.filter(t => t.id !== taskToDelete));
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+    }
+  };
+
+  const handleEdit = (task: any) => {
+    setEditingTask(task);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveTask = async (taskId: string, updates: any) => {
+    try {
+      await updateTask(taskId, updates);
+      setTasks(tasks.map(t => (t.id === taskId ? { ...t, ...updates } : t)));
+      setIsEditModalOpen(false); // Close modal after saving
+      loadTasks(); // Reload tasks to ensure all data is fresh, especially if assignedByName changes
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const styles = {
+      high: 'bg-red-50 text-red-700 ring-red-600/20',
+      medium: 'bg-orange-50 text-orange-700 ring-orange-600/20',
+      low: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+      default: 'bg-gray-50 text-gray-600 ring-gray-500/20'
+    };
+    const style = styles[priority as keyof typeof styles] || styles.default;
+
+    return (
+      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ring-1 ring-inset ${style} capitalize`}>
+        {priority || 'medium'}
+      </span>
+    );
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+  };
+
+  const filteredTasks = tasks.filter(task => {
+    const matchesTab = task.status === activeTab;
+    const matchesSearch = task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
+
+  const TaskItem = ({ task }: { task: any }) => (
+    <div className="group flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white border border-gray-200 rounded-xl hover:shadow-md transition-all duration-200 mb-3">
+      <div className="flex-1 min-w-0 pr-4">
+        <div className="flex items-center gap-3 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 truncate" title={task.title}>
+            {task.title || 'Untitled Task'}
+          </h3>
+          {getPriorityBadge(task.priority)}
+        </div>
+        <p className="text-sm text-gray-600 line-clamp-2 mb-3 sm:mb-0">
+          {task.description}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-6 flex-shrink-0 mt-3 sm:mt-0">
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <FiClock className="w-4 h-4" />
+            <span>{formatDate(task.created_at)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>Assigned by: {task.assignedByName || 'Unknown'}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => handleEdit(task)}
+            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Edit Task"
+          >
+            <FiEdit2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => handleDeleteClick(task.id)}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete Task"
+          >
+            <FiTrash2 className="w-5 h-5" />
+          </button>
+
+          <div className="w-px h-6 bg-gray-200 mx-1" />
+
+          {task.status !== 'pending' && (
+            <button
+              onClick={() => handleStatusChange(task.id, 'pending')}
+              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Move to To Do"
+            >
+              <FiCircle className="w-5 h-5" />
+            </button>
+          )}
+          {task.status !== 'in-progress' && (
+            <button
+              onClick={() => handleStatusChange(task.id, 'in-progress')}
+              className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Move to In Progress"
+            >
+              <FiClock className="w-5 h-5" />
+            </button>
+          )}
+          {task.status !== 'completed' && (
+            <button
+              onClick={() => handleStatusChange(task.id, 'completed')}
+              className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+              title="Mark Complete"
+            >
+              <FiCheckCircle className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
-            My Tasks
-          </h1>
-          <p className="text-gray-600">Track and manage your assigned work</p>
-        </div>
+    <div className="min-h-screen bg-gray-50/50 p-8 font-sans">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">My Tasks</h1>
+            <p className="text-gray-500 mt-1">Manage your daily workload efficiently</p>
+          </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <button
-            onClick={() => setFilter('all')}
-            className={`p-4 rounded-xl shadow-lg transition-all ${
-              filter === 'all' 
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
-                : 'bg-white hover:shadow-xl text-gray-800'
-            }`}
-          >
-            <div className="text-3xl font-bold">{tasks.length}</div>
-            <div className="text-sm opacity-90">Total Tasks</div>
-          </button>
-
-          <button
-            onClick={() => setFilter('pending')}
-            className={`p-4 rounded-xl shadow-lg transition-all ${
-              filter === 'pending' 
-                ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white' 
-                : 'bg-white hover:shadow-xl text-gray-800'
-            }`}
-          >
-            <div className="text-3xl font-bold">{pendingCount}</div>
-            <div className="text-sm opacity-90">Pending</div>
-          </button>
-
-          <button
-            onClick={() => setFilter('in-progress')}
-            className={`p-4 rounded-xl shadow-lg transition-all ${
-              filter === 'in-progress' 
-                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' 
-                : 'bg-white hover:shadow-xl text-gray-800'
-            }`}
-          >
-            <div className="text-3xl font-bold">{inProgressCount}</div>
-            <div className="text-sm opacity-90">In Progress</div>
-          </button>
-
-          <button
-            onClick={() => setFilter('completed')}
-            className={`p-4 rounded-xl shadow-lg transition-all ${
-              filter === 'completed' 
-                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                : 'bg-white hover:shadow-xl text-gray-800'
-            }`}
-          >
-            <div className="text-3xl font-bold">{completedCount}</div>
-            <div className="text-sm opacity-90">Completed</div>
-          </button>
-        </div>
-
-        {/* Tasks List */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-            {filter === 'all' ? 'All Tasks' : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Tasks`}
-          </h2>
-
-          {filteredTasks.length === 0 ? (
-            <div className="text-center py-12">
-              <FiCheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">No tasks found</p>
-              <p className="text-gray-400 text-sm">You're all caught up! 🎉</p>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FiSearch className="h-5 w-5 text-gray-400" />
             </div>
+            <input
+              type="text"
+              className="block w-full sm:w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Tabs Navigation */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            {[
+              { id: 'pending', name: 'To Do', count: tasks.filter(t => t.status === 'pending').length },
+              { id: 'in-progress', name: 'In Progress', count: tasks.filter(t => t.status === 'in-progress').length },
+              { id: 'completed', name: 'Completed', count: tasks.filter(t => t.status === 'completed').length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`
+                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors duration-200
+                  ${activeTab === tab.id
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                `}
+              >
+                {tab.name}
+                <span className={`
+                  ml-2 py-0.5 px-2.5 rounded-full text-xs font-medium
+                  ${activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}
+                `}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Task List */}
+        <div className="space-y-2">
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map(task => (
+              <TaskItem key={task.id} task={task} />
+            ))
           ) : (
-            <div className="space-y-4">
-              {filteredTasks.map(task => (
-                <div 
-                  key={task.id} 
-                  className="p-5 border-2 border-gray-200 rounded-lg hover:border-purple-300 transition-all"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="mt-1">
-                      {getStatusIcon(task.status)}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className={`text-lg font-medium ${
-                          task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-800'
-                        }`}>
-                          {task.description}
-                        </h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getPriorityColor(task.priority)}`}>
-                          {task.priority.toUpperCase()}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                        <div className="flex items-center gap-1">
-                          <FiUser className="w-4 h-4" />
-                          <span>{task.assignedBy}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <FiClock className="w-4 h-4" />
-                          <span>{formatDate(task.assignedAt)}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleStatusChange(task.id, 'pending')}
-                          disabled={task.status === 'pending'}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            task.status === 'pending'
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          Pending
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(task.id, 'in-progress')}
-                          disabled={task.status === 'in-progress'}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            task.status === 'in-progress'
-                              ? 'bg-orange-500 text-white cursor-not-allowed'
-                              : 'bg-orange-100 text-orange-700 hover:bg-orange-200 hover:scale-105'
-                          }`}
-                        >
-                          In Progress
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(task.id, 'completed')}
-                          disabled={task.status === 'completed'}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                            task.status === 'completed'
-                              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white cursor-not-allowed'
-                              : 'bg-green-100 text-green-700 hover:bg-gradient-to-r hover:from-green-500 hover:to-green-600 hover:text-white hover:scale-105'
-                          }`}
-                        >
-                          {task.status === 'completed' && <FiCheckCircle className="w-4 h-4" />}
-                          Mark Complete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
+              <div className="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center bg-gray-50 rounded-full mb-4">
+                <FiFilter className="h-6 w-6" />
+              </div>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No tasks found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {searchQuery ? 'Try adjusting your search terms.' : `You have no ${activeTab.replace('-', ' ')} tasks.`}
+              </p>
             </div>
           )}
         </div>
       </div>
+
+      <EditTaskModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveTask}
+        task={editingTask}
+      />
+
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? It will be moved to the Deleted tab."
+        confirmText="Delete"
+        type="danger"
+      />
     </div>
   );
 };

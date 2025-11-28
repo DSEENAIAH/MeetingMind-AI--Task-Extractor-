@@ -17,8 +17,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
-  
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState<{
@@ -26,7 +26,7 @@ export default function Login() {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
   }>({ title: '', message: '', type: 'info' });
-  
+
   const navigate = useNavigate();
   const { signIn, signUp, signInWithGoogle, signInWithGithub } = useAuth();
 
@@ -59,10 +59,10 @@ export default function Login() {
     const password = formData.get('password') as string;
 
     // Client-side validation
-    const errors: {[key: string]: string} = {};
+    const errors: { [key: string]: string } = {};
     if (!email) errors.email = 'Email is required';
     if (!password) errors.password = 'Password is required';
-    
+
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setLoading(false);
@@ -70,7 +70,7 @@ export default function Login() {
     }
 
     const { error } = await signIn(email, password);
-    
+
     if (error) {
       // Check if it's email verification error
       if (error.message.includes('Email not confirmed') || error.message.includes('email') && error.message.includes('confirm')) {
@@ -109,7 +109,7 @@ export default function Login() {
     const role = formData.get('role') as string;
 
     // Client-side validation
-    const errors: {[key: string]: string} = {};
+    const errors: { [key: string]: string } = {};
     if (!fullName) errors.fullName = 'Full name is required';
     if (!username) errors.username = 'Username is required';
     else if (username.length < 3) errors.username = 'Username must be at least 3 characters';
@@ -119,7 +119,7 @@ export default function Login() {
     if (!password) errors.password = 'Password is required';
     else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
     if (!role) errors.role = 'Role is required';
-    
+
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setLoading(false);
@@ -127,7 +127,7 @@ export default function Login() {
     }
 
     const { error } = await signUp(email, password, fullName, role, username);
-    
+
     if (error) {
       setModalConfig({
         title: 'Registration Failed',
@@ -162,22 +162,21 @@ export default function Login() {
 
       {/* Animated background circles */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-orange-200/30 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-red-200/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-red-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       <div className="w-full max-w-4xl">
         {/* Removed success/error banners - now using Modal */}
 
         {/* Main Card Container */}
         <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden" style={{ height: '550px' }}>
           <div className="relative h-full flex">
-            
+
             {/* Sign In Form - RIGHT side by default */}
-            <div 
-              className={`absolute right-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${
-                isSignUp 
-                  ? 'opacity-0 pointer-events-none z-0' 
+            <div
+              className={`absolute right-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${isSignUp
+                  ? 'opacity-0 pointer-events-none z-0'
                   : 'opacity-100 pointer-events-auto z-20'
-              }`}
+                }`}
             >
               <div className="w-full max-w-sm mx-auto">
                 <div className="mb-6 text-center">
@@ -206,7 +205,7 @@ export default function Login() {
                         </svg>
                         {validationErrors.email}
                       </div>
-                    )}  
+                    )}
                   </div>
 
                   <div className={`relative ${validationErrors.password ? 'mb-8' : ''}`}>
@@ -284,12 +283,11 @@ export default function Login() {
             </div>
 
             {/* Sign Up Form - LEFT side */}
-            <div 
-              className={`absolute left-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${
-                !isSignUp 
-                  ? 'opacity-0 pointer-events-none z-0' 
+            <div
+              className={`absolute left-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${!isSignUp
+                  ? 'opacity-0 pointer-events-none z-0'
                   : 'opacity-100 pointer-events-auto z-20'
-              }`}
+                }`}
             >
               <div className="w-full max-w-sm mx-auto">
                 <div className="mb-6 text-center">
@@ -378,10 +376,6 @@ export default function Login() {
                       defaultValue=""
                     >
                       <option value="" disabled className="text-gray-500">Select your role</option>
-                      <option value="ceo">CEO</option>
-                      <option value="cto">CTO</option>
-                      <option value="vp_engineering">VP Engineering</option>
-                      <option value="director">Director</option>
                       <option value="engineering_manager">Engineering Manager</option>
                       <option value="product_manager">Product Manager</option>
                       <option value="team_lead">Team Lead</option>
@@ -439,12 +433,11 @@ export default function Login() {
             </div>
 
             {/* Curved Wave Panel - Slides between left and right */}
-            <div 
-              className={`absolute top-0 bottom-0 w-full md:w-1/2 transition-all duration-700 ease-in-out z-10 ${
-                isSignUp 
-                  ? 'md:right-0 md:left-auto' 
+            <div
+              className={`absolute top-0 bottom-0 w-full md:w-1/2 transition-all duration-700 ease-in-out z-10 ${isSignUp
+                  ? 'md:right-0 md:left-auto'
                   : 'md:left-0 md:right-auto'
-              }`}
+                }`}
             >
               {/* Curved SVG Shape */}
               <div className="relative h-full bg-gradient-to-br from-orange-500 via-red-500 via-purple-600 to-blue-600 flex items-center justify-center overflow-hidden shadow-inner">
@@ -452,7 +445,7 @@ export default function Login() {
                 <div className="absolute top-20 left-10 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl"></div>
                 <div className="absolute bottom-32 right-16 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl"></div>
                 <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-orange-400/30 rounded-full blur-xl"></div>
-                
+
                 {/* Curve on the right edge when on left side, curve on left edge when on right side */}
                 <svg
                   className={`absolute top-0 bottom-0 h-full w-32 ${isSignUp ? '-left-1' : '-right-1'}`}

@@ -25,6 +25,8 @@ import { Router, Request, Response } from 'express';
 import type { ExtractRequest, ExtractResponse } from '../types/index.js';
 import { extractTasksWithGemini } from '../lib/llmClient.js';
 import { extractTasksMock } from '../lib/mockExtractor.js';
+import { supabase } from '../lib/supabase.js';
+import { matchUser } from '../lib/userMatcher.js';
 
 const router = Router();
 
@@ -93,10 +95,28 @@ router.post('/', async (req: Request, res: Response) => {
     console.log(`[Extract] Gemini extracted ${response.tasks.length} tasks`);
 
     // Return successful response
+    // Fetch all users for matching
+    const { data: users } = await supabase
+      .from('user_profiles')
+      .select('*');
+
+    // Match assignees to users
+    if (users && users.length > 0) {
+      response.tasks = response.tasks.map(task => {
+        if (task.assignee) {
+          const matched = matchUser(task.assignee, users);
+          if (matched) {
+            task.matchedUser = matched;
+          }
+        }
+        return task;
+      });
+    }
+
     res.json(response);
   } catch (error) {
     console.error('[Extract] Error:', error);
-    
+
     res.status(500).json({
       error: 'Extraction failed',
       message: error instanceof Error ? error.message : 'Unknown error',
