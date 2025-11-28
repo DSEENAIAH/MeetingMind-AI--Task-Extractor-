@@ -55,7 +55,7 @@ frontend/
 
 ```powershell
 # Navigate to project root
-cd "c:\Users\Seenaiah\OneDrive\Documents\coading\MeetingMind AI"
+cd "MeetingMind AI"
 
 # Run both servers (opens in separate windows)
 .\run_dev.ps1
@@ -69,14 +69,14 @@ This opens two PowerShell windows:
 
 **Terminal 1 - Backend:**
 ```powershell
-cd "c:\Users\Seenaiah\OneDrive\Documents\coading\MeetingMind AI\backend"
+cd "backend"
 npm install  # Already done
 npm run dev
 ```
 
 **Terminal 2 - Frontend:**
 ```powershell
-cd "c:\Users\Seenaiah\OneDrive\Documents\coading\MeetingMind AI\frontend"
+cd "frontend"
 npm install  # Already done
 npm run dev
 ```
@@ -155,8 +155,6 @@ MeetingMind AI/
 ├── run_dev.ps1               # Windows dev script
 ├── run_dev.sh                # Linux/Mac dev script
 ├── README.md                 # This file
-├── DEMO.md                   # 90s demo script
-└── PROMPT.md                 # AI prompt examples
 ```
 
 ---
@@ -414,8 +412,6 @@ cd backend; npm test
 
 ## 📚 Additional Documentation
 
-- **[DEMO.md](./DEMO.md)** - 90-second demo script for presentations
-- **[PROMPT.md](./PROMPT.md)** - AI prompt engineering guide with examples
 - **[Frontend README](./frontend/README.md)** - Frontend-specific details (if needed)
 - **[Backend README](./backend/README.md)** - Backend-specific details (if needed)
 
