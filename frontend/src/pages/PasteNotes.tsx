@@ -3,7 +3,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { extractTasks, ExtractedTask } from '../api/apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import { FiAlertCircle, FiUsers } from 'react-icons/fi';
+import { supabase } from '../lib/supabase';
+import { FiAlertCircle, FiUsers, FiArrowRight, FiFileText, FiInfo, FiCheck, FiLoader, FiTrash2, FiPlayCircle } from 'react-icons/fi';
 
 interface TeamMember {
   id: string;
@@ -27,6 +28,7 @@ function PasteNotes() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[] | null>(null);
+  const [showTips, setShowTips] = useState(false);
 
   // Clear old extraction data when returning to paste page
   useEffect(() => {
@@ -45,31 +47,36 @@ function PasteNotes() {
 
       try {
         setLoadingTeam(true);
-        const headers = {
-          'Authorization': 'Bearer mock-token',
-          'x-user-id': user.id
-        };
 
-        // Fetch team info and members in parallel using backend API
-        const [teamRes, membersRes] = await Promise.all([
-          fetch(`http://localhost:5000/api/teams/${teamId}`, { headers }),
-          fetch(`http://localhost:5000/api/teams/${teamId}/members`, { headers })
-        ]);
+        // Fetch team info using Supabase directly
+        const { data: teamData, error: teamError } = await supabase
+          .from('teams')
+          .select('name')
+          .eq('id', teamId)
+          .single();
 
-        if (teamRes.ok) {
-          const teamData = await teamRes.json();
-          setTeamName(teamData.name);
-        } else {
-          console.error('Failed to fetch team:', await teamRes.text());
+        if (teamError) {
+          console.error('Failed to fetch team:', teamError);
           setError('Failed to load team details.');
+        } else {
+          setTeamName(teamData.name);
         }
 
-        if (membersRes.ok) {
-          const membersData = await membersRes.json();
-          setTeamMembers(membersData);
+        // Fetch team members using Supabase directly
+        const { data: membersData, error: membersError } = await supabase
+          .from('team_members')
+          .select(`
+            id,
+            user_id,
+            name,
+            role
+          `)
+          .eq('team_id', teamId);
+
+        if (membersError) {
+          console.error('Failed to fetch members:', membersError);
         } else {
-          console.error('Failed to fetch members:', await membersRes.text());
-          // Don't fail the whole page if members fail, just log it
+          setTeamMembers(membersData || []);
         }
 
       } catch (err) {
@@ -85,7 +92,6 @@ function PasteNotes() {
 
   /**
    * Handle task extraction from notes
-   * Tries backend API first, falls back to mock if unavailable
    */
   const handleExtract = useCallback(async () => {
     if (!notes.trim()) {
@@ -93,31 +99,25 @@ function PasteNotes() {
       return;
     }
 
-    console.log('[PasteNotes] Starting extraction...');
-    console.log('[PasteNotes] Notes length:', notes.length);
-
     setIsExtracting(true);
     setError(null);
     setExtractedTasks(null);
 
     try {
-      // Try real API extraction
-      console.log('[PasteNotes] Calling backend API...');
-      const response = await extractTasks(notes);
-      console.log('[PasteNotes] Backend response:', response.tasks.length, 'tasks');
+      const response = await extractTasks(notes, teamMembers);
       setExtractedTasks(response.tasks);
 
-      // Store in session storage for preview page with hash for cache invalidation
-      const notesHash = notes.substring(0, 50); // Simple hash: first 50 chars
+      // Store in session storage
+      const notesHash = notes.substring(0, 50);
       sessionStorage.setItem('extractedTasks', JSON.stringify(response.tasks));
       sessionStorage.setItem('originalNotes', notes);
       sessionStorage.setItem('notesHash', notesHash);
       sessionStorage.setItem('currentTeamId', teamId || '');
 
-      // Auto-navigate to preview after 1 second (gives user time to see success)
+      // Auto-navigate to preview after 1 second
       setTimeout(() => {
         navigate('/preview');
-      }, 1000);
+      }, 800);
 
     } catch (err) {
       console.error('[PasteNotes] API extraction failed:', err);
@@ -127,11 +127,7 @@ function PasteNotes() {
     }
   }, [notes, navigate, teamId]);
 
-  /**
-   * Handle keyboard shortcuts
-   */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Ctrl+Enter or Cmd+Enter to extract
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleExtract();
@@ -140,188 +136,194 @@ function PasteNotes() {
 
   if (loadingTeam) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
 
-  if (error && !teamName) { // Only show this error if team details couldn't be loaded at all
+  if (error && !teamName) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-12">
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-          <FiAlertCircle className="inline mr-2" />
-          <span className="text-sm font-medium">
-            {error} Please ensure the team ID is correct and you have access.
-          </span>
-        </div>
+      <div className="max-w-2xl mx-auto mt-12 p-4 bg-red-50 border border-red-100 rounded-lg text-red-800 flex items-center gap-3">
+        <FiAlertCircle className="w-5 h-5 flex-shrink-0" />
+        <span className="text-sm font-medium">{error} Please ensure the team ID is correct.</span>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Page Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded text-xs font-semibold uppercase tracking-wide">
-            Team: {teamName}
-          </span>
-          <span className="text-gray-400 text-sm">|</span>
-          <span className="text-gray-500 text-sm flex items-center gap-1">
-            <FiUsers className="w-4 h-4" /> {teamMembers.length} members
-          </span>
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 border-b border-gray-200 pb-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Extract Tasks</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium border border-gray-200">
+              AI Powered
+            </span>
+          </div>
+          <p className="text-gray-500 text-sm max-w-xl">
+            Paste your meeting transcript below. Our AI will analyze the conversation and automatically identify actionable tasks, assignees, and deadlines.
+          </p>
         </div>
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
-          Extract Tasks from Meeting Notes
-        </h2>
-        <p className="text-gray-600">
-          Paste ANY meeting transcript below - our AI extracts ALL actionable tasks from ANY format.
-        </p>
+
+        <div className="flex items-center gap-4 text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-gray-900">{teamName}</span>
+          </div>
+          <div className="w-px h-4 bg-gray-300"></div>
+          <div className="flex items-center gap-1.5">
+            <FiUsers className="w-4 h-4" />
+            <span>{teamMembers.length} members</span>
+          </div>
+        </div>
       </div>
 
-      {/* Transcript Input Area */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <label htmlFor="meeting-notes" className="block text-sm font-medium text-gray-700 mb-2">
-          Meeting Notes
-        </label>
-        <textarea
-          id="meeting-notes"
-          data-testid="notes-textarea"
-          className="w-full h-96 p-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y font-mono text-sm"
-          placeholder={`Paste ANY meeting transcript here - our AI handles ALL formats:
-
-📝 Bullet lists:
-- John to review PR by Friday
-- Sarah will update docs
-
-🎙️ Timestamped transcripts:
-00:03 Karen: Sam, can you update the setup guide by Thursday?
-00:15 David: Lina, please upload the component library today
-
-💬 Conversational notes:
-Ramya, finish the report by 10pm
-John mentioned he'll review code tomorrow
-Everyone needs to complete self-assessments by Monday
-
-📋 Mixed formats, messy notes, any structure - we extract ALL tasks!
-
-Press Ctrl+Enter to extract tasks quickly!`}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onKeyDown={handleKeyDown}
-          aria-label="Meeting notes input"
-          aria-describedby="notes-help"
-        />
-        <p id="notes-help" className="mt-2 text-xs text-gray-500">
-          Tip: Press <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded">Ctrl+Enter</kbd> to extract tasks
-        </p>
-
-        {/* Error Message */}
-        {error && (
-          <div
-            className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md"
-            role="alert"
-            aria-live="assertive"
-          >
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
-        {/* Success Preview */}
-        {extractedTasks && (
-          <div
-            className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="flex items-center mb-2">
-              <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm font-medium text-green-800">
-                Extracted {extractedTasks.length} task{extractedTasks.length !== 1 ? 's' : ''}
-              </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Input Area */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-shadow hover:shadow-md">
+            <div className="p-1 bg-gray-50 border-b border-gray-200 flex justify-between items-center px-4 py-2">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Transcript Input</span>
+              <button
+                onClick={() => setNotes('')}
+                className="text-xs text-gray-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                disabled={!notes}
+              >
+                <FiTrash2 className="w-3 h-3" /> Clear
+              </button>
             </div>
-            <p className="text-xs text-green-700">Redirecting to preview...</p>
-          </div>
-        )}
+            <textarea
+              id="meeting-notes"
+              className="w-full h-[500px] p-6 focus:outline-none resize-none font-mono text-sm text-gray-800 leading-relaxed placeholder-gray-400"
+              placeholder="Paste your meeting notes here..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
 
-        {/* Extract Button */}
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            data-testid="extract-button"
-            onClick={handleExtract}
-            disabled={isExtracting || !notes.trim()}
-            className={`px-6 py-3 rounded-md font-medium transition-colors ${isExtracting || !notes.trim()
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-              }`}
-            aria-label={isExtracting ? 'Extracting tasks...' : 'Extract tasks from notes'}
-          >
-            {isExtracting ? (
-              <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Extracting...
-              </span>
-            ) : (
-              'Extract Tasks'
-            )}
-          </button>
+            {/* Action Bar */}
+            <div className="bg-gray-50 border-t border-gray-200 p-4 flex items-center justify-between">
+              <div className="text-xs text-gray-500 flex items-center gap-2">
+                <span className="hidden sm:inline">Pro tip: Press</span>
+                <kbd className="px-2 py-1 bg-white border border-gray-200 rounded text-gray-600 font-sans text-[10px] shadow-sm">Ctrl + Enter</kbd>
+                <span className="hidden sm:inline">to extract</span>
+              </div>
+
+              <button
+                onClick={handleExtract}
+                disabled={isExtracting || !notes.trim()}
+                className={`
+                  flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm transition-all shadow-sm
+                  ${isExtracting || !notes.trim()
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                    : 'bg-gray-900 text-white hover:bg-black hover:shadow-md active:transform active:scale-95'
+                  }
+                `}
+              >
+                {isExtracting ? (
+                  <>
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Extract Tasks</span>
+                    <FiArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <FiAlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div className="text-sm text-red-800">{error}</div>
+            </div>
+          )}
+
+          {extractedTasks && (
+            <div className="p-4 bg-green-50 border border-green-100 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                <FiCheck className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-900">Success!</p>
+                <p className="text-xs text-green-700">Extracted {extractedTasks.length} tasks. Redirecting...</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Sample Notes (for demo) */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800 mb-2">
-            <strong>Demo tip:</strong> Don't have meeting notes handy? Click below to load sample transcripts.
-          </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setNotes(`The project planning meeting was held on Feb 4, 2025 with Sarah, James, Priya, and Marco. Sarah began by outlining tasks for the "Client Dashboard Upgrade" project. Priya was assigned to create the updated dashboard layout and analytics page mock-ups, with a deadline of February 10. James would begin development after receiving Priya's mock-ups and was given until February 20 to complete the analytics API and dashboard logic. Marco was scheduled to start QA testing on February 21 and finish by February 26. The team agreed to hold a final project review on February 27. Everyone confirmed the tasks and deadlines, and the meeting concluded.`)}
-              className="text-sm text-blue-600 hover:text-blue-700 underline"
-            >
-              Load paragraph transcript
-            </button>
-            <button
-              type="button"
-              onClick={() => setNotes(`Team Standup Meeting Transcript - November 24, 2025
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* How it works */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <FiInfo className="w-4 h-4 text-gray-400" />
+              How it works
+            </h3>
+            <ul className="space-y-3">
+              {[
+                'Paste any meeting transcript or notes.',
+                'AI identifies action items and deadlines.',
+                'Tasks are matched to team members.',
+                'Review and confirm before creating.'
+              ].map((step, i) => (
+                <li key={i} className="flex gap-3 text-sm text-gray-600">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-medium border border-gray-200">
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Sample Data */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <FiFileText className="w-4 h-4 text-gray-400" />
+              Try with sample data
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={() => setNotes(`The project planning meeting was held on Feb 4, 2025 with Sarah, James, Priya, and Marco. Sarah began by outlining tasks for the "Client Dashboard Upgrade" project. Priya was assigned to create the updated dashboard layout and analytics page mock-ups, with a deadline of February 10. James would begin development after receiving Priya's mock-ups and was given until February 20 to complete the analytics API and dashboard logic. Marco was scheduled to start QA testing on February 21 and finish by February 26. The team agreed to hold a final project review on February 27. Everyone confirmed the tasks and deadlines, and the meeting concluded.`)}
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-900">Project Planning</span>
+                  <FiPlayCircle className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                </div>
+                <p className="text-xs text-gray-500 line-clamp-2">
+                  Narrative style notes about a dashboard upgrade project with assignments.
+                </p>
+              </button>
+
+              <button
+                onClick={() => setNotes(`Team Standup Meeting Transcript - November 24, 2025
 
 Attendees: John, Sarah, Mike, Ramya, Lisa
 
 Discussion:
-
 Ramya, this is your task - finish the quarterly report by 10pm today
-
 John mentioned he'll review PR #234 tomorrow morning
-
 Sarah said she needs to update the API documentation by Friday
-
 We told Mike to fix that urgent login bug ASAP - it's blocking QA testing
-
-Lisa will handle the client demo and needs to prepare slides by end of week
-
-Manager: "Also, someone should schedule a follow-up meeting with the design team"
-
-John: "I'll take care of deploying the hotfix to production by EOD"
-
-Sarah: "I can work on updating the project timeline in Zoho Projects"
-
-Action items discussed:
-- Code review completion needed urgently
-- Documentation updates are high priority
-- Bug fixes required before release
-- Client feedback needs follow-up
-
-Next standup: Tomorrow 9 AM`)}
-              className="text-sm text-blue-600 hover:text-blue-700 underline"
-            >
-              Load conversational notes
-            </button>
+Lisa will handle the client demo and needs to prepare slides by end of week`)}
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-900">Daily Standup</span>
+                  <FiPlayCircle className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                </div>
+                <p className="text-xs text-gray-500 line-clamp-2">
+                  Bullet-point style standup notes with quick action items.
+                </p>
+              </button>
+            </div>
           </div>
         </div>
       </div>

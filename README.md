@@ -1,432 +1,92 @@
-# MeetingMind AI
+# 🧠 MeetingMind AI
 
-> AI-powered task extraction from meeting notes → Zoho Projects integration
-
-A modern, production-ready web application that uses AI to extract actionable tasks from meeting notes and creates them directly in Zoho Projects.
+> **Transforming Conversations into Action.**
 
 ---
 
-## 🎯 What We've Built So Far
+## 🚀 Who is this for?
 
-### ✅ Frontend (React + TypeScript + Tailwind)
+**MeetingMind AI** is crafted for **modern teams**, **project managers**, and **Zoho ecosystem users** who value efficiency above all else.
 
-**Status:** Running at http://localhost:3000
-
-**Features:**
-- 📝 **Paste Notes**: Main landing page with large textarea for meeting notes
-- 👀 **Preview Tasks**: Review and edit extracted tasks before creating them
-- 📊 **Dashboard**: Overview of activity and quick actions
-- 🧩 **TaskRow Component**: Inline editing, priority badges, remove functionality
-
-**Technical Stack:**
-- **Vite** - Lightning-fast dev server and build tool
-- **React 18** - Latest React with hooks and TypeScript
-- **React Router** - Client-side routing for SPA navigation
-- **Tailwind CSS** - Utility-first styling for clean, responsive UI
-- **Vitest** - Fast unit testing (test file included)
-
-**Key Files:**
-```
-frontend/
-├── src/
-│   ├── main.tsx              # App entry point
-│   ├── App.tsx               # Top-level router + layout
-│   ├── api/
-│   │   └── apiClient.ts      # Centralized API client (mock-ready)
-│   ├── pages/
-│   │   ├── PasteNotes.tsx    # Extract tasks from notes
-│   │   ├── PreviewTasks.tsx  # Review/edit tasks before creation
-│   │   └── Dashboard.tsx     # Activity overview
-│   ├── components/
-│   │   └── TaskRow.tsx       # Individual task item with inline editing
-│   └── __tests__/
-│       └── PasteNotes.test.tsx  # Sample test
-├── package.json              # Dependencies and scripts
-├── vite.config.ts            # Vite config with API proxy
-├── tailwind.config.js        # Tailwind CSS config
-└── .env                      # Environment variables
-```
+| **Audience** | **Benefit** |
+| :--- | :--- |
+| 👩‍💼 **Project Managers** | Stop spending hours manually converting notes into tasks. |
+| 🏃 **Agile Teams** | Capture action items instantly during stand-ups & retrospectives. |
+| 🏢 **Zoho Users** | A seamless bridge between your discussions and Zoho Projects. |
 
 ---
 
-## 🚀 Quick Start
+## 💡 Why did we build this?
 
-### Option 1: Run with PowerShell Script (Easiest)
+We noticed a critical gap in the workflow of productive teams: **The "Post-Meeting Slump."**
 
-```powershell
-# Navigate to project root
-cd "MeetingMind AI"
+Great ideas and action items often get lost in long transcripts or messy notepads. Manually identifying tasks, assigning them to the right people, and setting due dates is:
 
-# Run both servers (opens in separate windows)
-.\run_dev.ps1
-```
+*   ⏳ **Time-consuming**
+*   ❌ **Prone to human error**
+*   🛑 **A disruption to creative flow**
 
-This opens two PowerShell windows:
-- **Frontend**: http://localhost:3000
-- **Backend**: http://localhost:5000
-
-### Option 2: Manual Start (Two Terminals)
-
-**Terminal 1 - Backend:**
-```powershell
-cd "backend"
-npm install  # Already done
-npm run dev
-```
-
-**Terminal 2 - Frontend:**
-```powershell
-cd "frontend"
-npm install  # Already done
-npm run dev
-```
-
-### Option 3: Docker Compose
-
-```powershell
-# Build and run both services
-docker-compose up --build
-
-# Or for development with hot reload
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
+We built MeetingMind AI to **automate the administrative burden**, allowing teams to focus on *doing* the work, not just *managing* it.
 
 ---
 
-## 🎯 Test the Full Stack
+## ⚡ What does it do?
 
-**Both servers are currently running! Try this:**
+**MeetingMind AI** is an intelligent assistant that lives where you work. It uses advanced Artificial Intelligence to analyze your meeting notes and instantly structure them into actionable tasks.
 
-1. **Open the app:** http://localhost:3000
-2. **Load sample notes:** Click the "Load sample meeting notes" button
-3. **Extract tasks:** Click "Extract Tasks" or press Ctrl+Enter
-4. **Review tasks:** Automatically redirected to preview page
-5. **Edit a task:** Click the pencil icon, modify details, click checkmark
-6. **Create in Zoho:** Click "Create in Zoho Projects" (returns mock URLs)
-7. **Check backend:** Visit http://localhost:5000/health
+### ✨ Key Capabilities
 
-### API Endpoints You Can Test
-
-```powershell
-# Health check
-curl http://localhost:5000/health
-
-# Extract tasks (from PowerShell)
-$body = @{ notes = "- John to review PR`n- Sarah will update docs" } | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:5000/api/extract -Method Post -Body $body -ContentType "application/json"
-
-# Create tasks
-$body = @{
-  tasks = @(
-    @{ title = "Review PR"; description = "Code review"; priority = "high" }
-  )
-} | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:5000/api/create-tasks -Method Post -Body $body -ContentType "application/json"
-```
+*   **📝 Instant Extraction**: Paste raw notes, get structured tasks.
+*   **🧠 Context Awareness**: Auto-detects **Assignees**, **Priorities**, and **Due Dates**.
+*   **🔗 Zoho Integration**: Push tasks directly to **Zoho Projects** or use via **Zoho Cliq**.
+*   **🛡️ Privacy First**: Secure processing with no long-term data retention.
 
 ---
 
-## 📁 Project Structure
+## 🛠️ How to Install
 
-```
-MeetingMind AI/
-├── frontend/                  # React + TypeScript + Tailwind
-│   ├── src/
-│   │   ├── api/              # API client
-│   │   ├── pages/            # Route components
-│   │   ├── components/       # Reusable UI
-│   │   └── __tests__/        # Frontend tests
-│   ├── public/               # Static assets
-│   ├── Dockerfile            # Production container
-│   ├── nginx.conf            # Nginx config for SPA
-│   └── package.json
-│
-├── backend/                   # Express + TypeScript
-│   ├── src/
-│   │   ├── routes/           # API endpoints
-│   │   ├── lib/              # Business logic
-│   │   ├── types/            # TypeScript interfaces
-│   │   └── __tests__/        # Backend tests
-│   ├── Dockerfile            # Production container
-│   └── package.json
-│
-├── docker-compose.yml         # Docker orchestration
-├── docker-compose.dev.yml     # Dev overrides
-├── run_dev.ps1               # Windows dev script
-├── run_dev.sh                # Linux/Mac dev script
-├── README.md                 # This file
-```
+Getting started with MeetingMind AI is designed to be simple.
+
+### 1️⃣ Prerequisites
+Before you begin, ensure you have the following:
+*   A **Zoho** account (for Projects/Cliq integration).
+*   **Node.js** installed on your system (for local use).
+*   An API Key for the AI provider (e.g., Gemini/OpenAI).
+
+### 2️⃣ Installation Steps
+
+**For the Web Application:**
+1.  **Clone the Repository**: Download the source code to your local machine.
+2.  **Install Dependencies**: Run the setup command to install necessary packages.
+3.  **Configure Environment**: Create a `.env` file and add your API keys and Zoho credentials.
+4.  **Launch**: Start the application to open the dashboard in your browser.
+
+**For the Zoho Cliq Extension:**
+1.  **Create Extension**: Go to the Zoho Developer Console.
+2.  **Setup Command**: Create a slash command (e.g., `/meetingmind`).
+3.  **Link Backend**: Point the command URL to your deployed MeetingMind API endpoint.
+4.  **Publish**: Install the extension to your Zoho Cliq organization.
 
 ---
 
-## 🎨 UI/UX Highlights
+## 🎮 How to Use
 
-### Human-Centered Design
-- **Clear microcopy**: Every button, label, and error message is friendly and descriptive
-- **Accessible markup**: ARIA labels, semantic HTML, keyboard shortcuts (Ctrl+Enter to extract)
-- **Loading states**: Spinners and disabled states during async operations
-- **Error handling**: User-friendly error messages with fallback to mock mode
-- **Progressive enhancement**: Sample notes button for quick demos
+Once installed, MeetingMind AI fits right into your workflow.
 
-### Visual Polish
-- **Tailwind utility classes** for consistent spacing, colors, and typography
-- **Responsive grid layouts** that work on mobile/tablet/desktop
-- **Icon system** using Heroicons (inline SVGs, no dependencies)
-- **Color-coded priorities** (gray=low, yellow=medium, red=high)
-- **Smooth transitions** on hover and focus states
+### 🖥️ Web Dashboard Flow
 
----
+1.  **Paste Notes**: Open the app and paste your meeting transcript or rough notes into the text area.
+2.  **Click "Extract"**: Hit the magic button. The AI analyzes the text in seconds.
+3.  **Review & Edit**: See the extracted tasks in a clean list. Edit details if needed.
+4.  **Export**: Click "Create in Zoho Projects" to instantly sync them to your project management tool.
 
-## 🔧 Backend (Node.js + Express + TypeScript)
+### 💬 Zoho Cliq Workflow
 
-**Status:** ✅ Running at http://localhost:5000
-
-The backend is fully implemented with:
-
-### ✅ Implemented Features
-
-1. **AI Task Extraction** (`POST /api/extract`)
-   - ✅ Real AI integration with Google Gemini
-   - ✅ Fallback to mock extraction if API key missing
-   - ✅ Detects tasks, assignees, priorities, and due dates
-   - ✅ Structured JSON output
-
-2. **Team Management** (`/api/teams`)
-   - ✅ Create and manage teams
-   - ✅ Add/remove team members with roles
-   - ✅ Role-based access control (RBAC) via Supabase RLS
-   - ✅ Real-time updates
-
-3. **Authentication** (Supabase Auth)
-   - ✅ Email/Password login and signup
-   - ✅ Role-based signup (Manager level and below)
-   - ✅ Secure session management
-   - ✅ Protected API routes
-
-4. **Database** (Supabase PostgreSQL)
-   - ✅ Complete schema for Users, Teams, Tasks, Transcripts
-   - ✅ Row Level Security (RLS) policies
-   - ✅ Automated timestamp triggers
-
-### Backend Structure
-```
-backend/
-├── src/
-│   ├── server.ts                 # ✅ Express app setup
-│   ├── routes/
-│   │   ├── extract.ts            # ✅ Task extraction endpoint
-│   │   ├── teams.ts              # ✅ Team management
-│   │   ├── auth.ts               # ✅ Auth routes
-│   │   └── cliq.ts               # ✅ Cliq webhook handler
-│   ├── lib/
-│   │   ├── llmClient.ts          # ✅ Gemini AI client
-│   │   ├── supabase.ts           # ✅ Supabase client
-│   │   └── mockExtractor.ts      # ✅ Fallback extractor
-│   ├── types/
-│   │   └── index.ts              # ✅ Shared TypeScript interfaces
-├── package.json                   # ✅ Dependencies configured
-├── tsconfig.json                  # ✅ TypeScript config
-├── .env                           # ✅ Local config
-└── .gitignore                     # ✅ Git exclusions
-```
-
-**All files are created and working!** The backend is production-ready.
+1.  **Type the Command**: In any chat window, type `/meetingmind` followed by your notes.
+    > Example: `/meetingmind John to fix the login bug by Friday.`
+2.  **Instant Response**: The bot replies with a formatted card showing the extracted task.
+3.  **Action**: Confirm the details directly within the chat interface.
 
 ---
 
-## 📦 Deployment Strategy
-
-### Frontend (Vercel - Recommended)
-```bash
-# Build static assets
-npm run build
-
-# Deploy to Vercel
-vercel --prod
-
-# Environment variables needed:
-# VITE_API_URL=https://your-backend.herokuapp.com/api
-```
-
-### Backend (Heroku/Render/Railway)
-```bash
-# Using Heroku as example
-heroku create meetingmind-api
-heroku config:set USE_MOCK=false
-heroku config:set OPENAI_API_KEY=sk-...
-heroku config:set ZOHO_CLIENT_ID=...
-heroku config:set ZOHO_CLIENT_SECRET=...
-git push heroku main
-```
-
-**Environment Variables Checklist:**
-- `USE_MOCK` - Set to `true` for demo mode (no LLM calls)
-- `OPENAI_API_KEY` - Your OpenAI API key (or Anthropic/Gemini)
-- `ZOHO_CLIENT_ID` - Zoho OAuth client ID
-- `ZOHO_CLIENT_SECRET` - Zoho OAuth client secret
-- `ZOHO_REDIRECT_URI` - OAuth callback URL
-- `SESSION_SECRET` - Random string for session encryption
-- `PORT` - Server port (default: 5000)
-
----
-
-## 🧪 Testing
-
-### Frontend Tests
-```powershell
-cd frontend
-npm test                    # Run all tests
-npm run test:watch          # Watch mode for TDD
-```
-
-Current coverage:
-- ✅ PasteNotes component rendering
-- ✅ API client type safety
-- ✅ Task extraction flow
-
-### Backend Tests
-```powershell
-cd backend
-npm test                    # Run all tests
-npm run test:watch          # Watch mode
-```
-
-Current coverage:
-- ✅ Mock extraction with bullet points
-- ✅ Priority detection from keywords
-- ✅ Assignee extraction (@mentions and "Name will" patterns)
-- ✅ Task normalization
-- ✅ Edge cases (empty notes, deterministic output)
-
----
-
-## 📝 Development Notes
-
-### Why Mock-First?
-We built the frontend with **deterministic mock data** so:
-- ✅ Judges can demo without API keys
-- ✅ UI development doesn't depend on backend
-- ✅ E2E testing is reproducible
-- ✅ Faster iteration during development
-
-Toggle between mock and real AI via `USE_MOCK` environment variable.
-
-### Security Best Practices
-- ❌ **Never** store API keys or secrets in frontend code
-- ✅ All secrets in `.env` files (gitignored)
-- ✅ Backend handles OAuth tokens (cookies, not localStorage)
-- ✅ CORS configured for production domains only
-- ✅ Input validation on both frontend and backend
-
-### Code Quality Standards
-Every file includes:
-- 📄 **Docblock header** explaining purpose and tradeoffs
-- 💬 **Inline comments** for complex logic
-- 🔖 **TODO markers** for Zoho integration points
-- 🎯 **TypeScript interfaces** for all data shapes
-- ♿ **Accessibility attributes** (ARIA labels, semantic HTML)
-- 🧪 **Test IDs** on interactive elements
-
----
-
-## 🤝 Contributing
-
-This is a production-minded project. When adding features:
-
-1. **Write human-friendly code** - Name variables clearly, add comments explaining "why"
-2. **Keep files focused** - Split into modules if >400 lines
-3. **Test as you go** - Add unit tests for new logic
-4. **Update this README** - Document new endpoints, env vars, or deployment steps
-
----
-
-## 📄 License
-
-MIT - Built for Zoho ecosystem integration
-
----
-
-## 🙏 Next Steps for You
-
-1. **Test the frontend flow:**
-   - Visit http://localhost:3000
-   - Paste sample notes (or click "Load sample notes")
-   - Extract tasks (uses mock data for now)
-   - Preview and edit tasks
-   - Notice the "Create in Zoho" button (will work once backend is ready)
-
-2. **Let me know when you're ready for the backend:**
-   - I'll create the Express TypeScript server
-   - Implement mock `/api/extract` endpoint
-   - Add Zoho OAuth stubs with clear TODOs
-   - Set up Docker Compose for full-stack dev
-
-3. **Questions to answer before backend:**
-   - Which AI model do you want to use? (OpenAI GPT-4, Claude, Gemini, etc.)
-   - Do you already have Zoho OAuth credentials, or need help setting those up?
-   - Any specific Zoho Projects fields you want to map? (custom fields, task lists, etc.)
-
----
-
-**Current Status:** ✅ Full-stack app running in mock mode  
-**Frontend:** http://localhost:3000  
-**Backend:** http://localhost:5000  
-**Next Steps:** Add real AI integration (OpenAI/Claude) and Zoho OAuth credentials  
-
----
-
-## 🎓 What You Can Do Right Now
-
-### 1. Demo the Full Flow
-- Paste notes → Extract → Preview → Edit → Create (see DEMO.md for script)
-
-### 2. Test the API Directly
-```powershell
-# PowerShell examples
-$notes = "- John to review PR`n- Sarah will update docs"
-$body = @{ notes = $notes } | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:5000/api/extract -Method Post -Body $body -ContentType "application/json"
-```
-
-### 3. Explore the Code
-- **Frontend:** Check out `frontend/src/pages/PasteNotes.tsx` for UI patterns
-- **Backend:** Look at `backend/src/lib/mockExtractor.ts` for extraction logic
-- **Types:** See `backend/src/types/index.ts` for data structures
-
-### 4. Run Tests
-```powershell
-# Frontend tests
-cd frontend; npm test
-
-# Backend tests
-cd backend; npm test
-```
-
-### 5. Customize for Your Needs
-- **Add AI:** Edit `backend/src/routes/extract.ts` to call OpenAI/Claude
-- **Add Zoho:** Set up OAuth credentials in `.env` and test auth flow
-- **Customize UI:** Modify Tailwind classes in frontend components
-- **Add features:** Task dependencies, recurring tasks, custom fields, etc.
-
----
-
-## 📚 Additional Documentation
-
-- **[Frontend README](./frontend/README.md)** - Frontend-specific details (if needed)
-- **[Backend README](./backend/README.md)** - Backend-specific details (if needed)
-
----
-
-## 🤝 Built With Production Mindset
-
-Every file in this project includes:
-- 📄 **Docblock headers** explaining purpose and design decisions
-- 💬 **Inline comments** for complex logic (the "why", not just the "what")
-- 🔖 **TODO markers** showing where to add real integrations
-- 🎯 **TypeScript types** for compile-time safety
-- ♿ **Accessibility** attributes (ARIA labels, semantic HTML)
-- 🧪 **Test coverage** for critical paths
-
-This is code you can actually deploy and maintain, not just a prototype.
-
----
+> *Empower your team to turn talk into action.*

@@ -3,23 +3,26 @@ import React from 'react';
 interface TeamTabsProps {
     activeTab: 'dashboard' | 'extract' | 'tasks';
     onTabChange: (tab: 'dashboard' | 'extract' | 'tasks') => void;
+    isAdmin: boolean;
 }
 
-const TeamTabs: React.FC<TeamTabsProps> = ({ activeTab, onTabChange }) => {
+const TeamTabs: React.FC<TeamTabsProps> = ({ activeTab, onTabChange, isAdmin }) => {
     return (
         <div className="border-b border-gray-200 mb-6">
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                <button
-                    onClick={() => onTabChange('dashboard')}
-                    className={`
+                {isAdmin && (
+                    <button
+                        onClick={() => onTabChange('dashboard')}
+                        className={`
                         whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
                         ${activeTab === 'dashboard'
-                            ? 'border-orange-500 text-orange-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                                ? 'border-orange-500 text-orange-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
                     `}
-                >
-                    Dashboard
-                </button>
+                    >
+                        Dashboard
+                    </button>
+                )}
                 <button
                     onClick={() => onTabChange('tasks')}
                     className={`
@@ -31,17 +34,19 @@ const TeamTabs: React.FC<TeamTabsProps> = ({ activeTab, onTabChange }) => {
                 >
                     Tasks
                 </button>
-                <button
-                    onClick={() => onTabChange('extract')}
-                    className={`
+                {isAdmin && (
+                    <button
+                        onClick={() => onTabChange('extract')}
+                        className={`
                         whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
                         ${activeTab === 'extract'
-                            ? 'border-orange-500 text-orange-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                                ? 'border-orange-500 text-orange-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
                     `}
-                >
-                    Extract Tasks
-                </button>
+                    >
+                        Extract Tasks
+                    </button>
+                )}
             </nav>
         </div>
     );

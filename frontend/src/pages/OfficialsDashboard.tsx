@@ -20,11 +20,13 @@ import {
   searchUsers,
   extractTasks,
   createTasks,
+  getTasks,
   getTeamStats,
   type Team,
   type UserProfile,
   type ExtractedTask
 } from '../api/apiClient';
+import { supabase } from '../lib/supabase';
 
 const OfficialsDashboard = () => {
   const { user } = useAuth();
@@ -44,12 +46,73 @@ const OfficialsDashboard = () => {
   const [selectedTeamForTranscript, setSelectedTeamForTranscript] = useState<string | null>(null);
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [teamStats, setTeamStats] = useState<any>(null);
+  const [teamTasks, setTeamTasks] = useState<any[]>([]);
+  const [tasksTab, setTasksTab] = useState<'all' | 'unassigned' | 'assigned'>('all');
 
   // Fetch user's teams on load
   useEffect(() => {
     if (!user) return;
     loadTeams();
-  }, [user]);
+
+    // Real-time subscriptions
+    const channel = supabase
+      .channel('officials-dashboard-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teams',
+          filter: `created_by=eq.${user.id}`,
+        },
+        () => {
+          loadTeams();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_members',
+        },
+        () => {
+          loadTeams();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          // If the task change relates to the currently selected team, reload stats
+          if (selectedTeam) {
+            // We can't easily check if the task belongs to the selected team from the payload alone 
+            // without a join or checking the team_id if it's in the payload.
+            // Assuming payload.new or payload.old has team_id.
+            const newTeamId = (payload.new as any)?.team_id;
+            const oldTeamId = (payload.old as any)?.team_id;
+
+            if (newTeamId === selectedTeam || oldTeamId === selectedTeam) {
+              // console.log('Tasks updated for selected team, reloading stats...');
+              loadTeamStats(selectedTeam);
+              loadTeamTasks(selectedTeam);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedTeam]); // Re-subscribe when selectedTeam changes to ensure closure captures it? 
+  // Actually, better to use a ref for selectedTeam or just reload stats if we can. 
+  // But putting selectedTeam in dependency array means we unsubscribe/resubscribe on every selection change.
+  // That's fine for now.
 
   const loadTeams = async () => {
     if (!user) return;
@@ -86,6 +149,7 @@ const OfficialsDashboard = () => {
     setSelectedTeam(teamId);
     setSelectedTeamForTranscript(teamId);
     loadTeamStats(teamId);
+    loadTeamTasks(teamId);
     // Smooth scroll to transcript area
     setTimeout(() => {
       document.getElementById('transcript-area')?.scrollIntoView({ behavior: 'smooth' });
@@ -98,6 +162,15 @@ const OfficialsDashboard = () => {
       setTeamStats(stats);
     } catch (error) {
       console.error('Failed to load stats:', error);
+    }
+  };
+
+  const loadTeamTasks = async (teamId: string) => {
+    try {
+      const data = await getTasks({ teamId });
+      setTeamTasks(data);
+    } catch (error) {
+      console.error('Failed to load team tasks:', error);
     }
   };
 
@@ -175,12 +248,7 @@ const OfficialsDashboard = () => {
     }
   };
 
-  const handleAssignTask = (taskIndex: number, memberUsername: string) => {
-    // Update local state for display
-    const updatedTasks = [...extractedTasks];
-    updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], assignee: memberUsername };
-    setExtractedTasks(updatedTasks);
-  };
+
 
   const handleSaveTasks = async () => {
     if (!selectedTeamForTranscript || !user) return;
@@ -191,7 +259,10 @@ const OfficialsDashboard = () => {
       alert('Tasks assigned successfully!');
       setExtractedTasks([]);
       setTranscript('');
+      setExtractedTasks([]);
+      setTranscript('');
       loadTeamStats(selectedTeamForTranscript); // Refresh stats
+      loadTeamTasks(selectedTeamForTranscript); // Refresh tasks
     } catch (error) {
       console.error('Failed to assign tasks:', error);
       alert('Failed to assign tasks. Please try again.');
@@ -505,8 +576,32 @@ Example:
                           <div className="flex flex-wrap items-center gap-3">
                             <div className="relative">
                               <select
-                                value={task.assignee || ''}
-                                onChange={(e) => handleAssignTask(idx, e.target.value)}
+                                value={task.matchedUser?.id || (currentTeamForTranscript?.members.find(m => m.username === task.assignee || m.name === task.assignee)?.user_id) || ''}
+                                onChange={(e) => {
+                                  const selectedId = e.target.value;
+                                  const member = currentTeamForTranscript?.members.find(m => m.user_id === selectedId);
+
+                                  const updatedTasks = [...extractedTasks];
+                                  if (member) {
+                                    updatedTasks[idx] = {
+                                      ...updatedTasks[idx],
+                                      assignee: member.name, // Keep name for display/fallback
+                                      matchedUser: {
+                                        id: member.user_id,
+                                        username: member.username || member.name,
+                                        full_name: member.name,
+                                        role: member.role
+                                      }
+                                    };
+                                  } else {
+                                    updatedTasks[idx] = {
+                                      ...updatedTasks[idx],
+                                      assignee: '',
+                                      matchedUser: undefined
+                                    };
+                                  }
+                                  setExtractedTasks(updatedTasks);
+                                }}
                                 className={`appearance-none pl-8 pr-8 py-1.5 rounded-lg text-sm font-medium border outline-none focus:ring-2 focus:ring-offset-1 ${task.assignee
                                   ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-500'
                                   : 'bg-gray-50 text-gray-600 border-gray-200 focus:ring-gray-400'
@@ -514,7 +609,7 @@ Example:
                               >
                                 <option value="">Unassigned</option>
                                 {currentTeamForTranscript?.members.map(member => (
-                                  <option key={member.id} value={member.username || member.name}>
+                                  <option key={member.id} value={member.user_id}>
                                     @{member.username || member.name}
                                   </option>
                                 ))}
@@ -552,6 +647,78 @@ Example:
                 </div>
               </div>
             )}
+            {/* Team Tasks Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-8">
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Team Tasks</h3>
+                  <p className="text-sm text-gray-500">Manage tasks for {currentTeam.name}</p>
+                </div>
+                <div className="flex bg-gray-200 rounded-lg p-1">
+                  {(['all', 'unassigned', 'assigned'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setTasksTab(tab)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${tasksTab === tab
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6">
+                {teamTasks
+                  .filter(task => {
+                    if (tasksTab === 'unassigned') return !task.assigned_to;
+                    if (tasksTab === 'assigned') return !!task.assigned_to;
+                    return true;
+                  })
+                  .map(task => (
+                    <div key={task.id} className="flex items-start justify-between p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium text-gray-900">{task.description}</h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                            task.priority === 'medium' ? 'bg-orange-100 text-orange-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                            {task.priority}
+                          </span>
+                          {!task.assigned_to && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                              Unassigned
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {task.assigned_to ? (
+                            <span className="flex items-center gap-1">
+                              Assigned to: <span className="font-medium text-gray-700">{task.assigned_to_name || 'Unknown'}</span>
+                            </span>
+                          ) : (
+                            <span className="text-red-500 flex items-center gap-1">
+                              <FiAlertCircle className="w-3 h-3" />
+                              {task.unassigned_reason || 'No assignee specified'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(task.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                {teamTasks.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No tasks found.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

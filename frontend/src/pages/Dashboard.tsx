@@ -9,8 +9,8 @@
 import { useState, useEffect } from 'react';
 import OfficialsDashboard from './OfficialsDashboard';
 import WorkersDashboard from './WorkersDashboard';
-import { FiUsers, FiUser } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
+import { checkAndCreateSampleData } from '../utils/sampleData';
 
 // Define official roles that can access OfficialsDashboard
 // These are the higher-level roles (managers, leads, directors, etc.)
@@ -30,7 +30,6 @@ const OFFICIAL_ROLES = [
 
 function Dashboard() {
   const { user } = useAuth();
-  console.log('Dashboard rendering, user:', user);
   const [userRole, setUserRole] = useState<'official' | 'worker'>('worker');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,6 +44,9 @@ function Dashboard() {
       } else {
         setUserRole('worker');
       }
+
+      // Create sample data for demonstration if none exists
+      checkAndCreateSampleData(user.id).catch(console.error);
 
       setIsLoading(false);
     }

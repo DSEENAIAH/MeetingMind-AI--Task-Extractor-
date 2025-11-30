@@ -1,22 +1,17 @@
 /**
  * apiClient.ts
  * 
- * Purpose: Centralized API client for communicating with the backend.
- * 
- * Design decisions:
- * - Single source of truth for all backend communication
- * - Graceful error handling with user-friendly messages
- * - Type-safe interfaces for requests/responses
- * - Falls back to mock data if backend is unreachable (useful for demos)
- * 
- * Security notes:
- * - No secrets stored in frontend code
- * - API URL comes from environment variables
- * - All auth tokens handled by backend (cookies or headers)
+ * Purpose: Client-side API functions using Supabase directly and AI services.
+ * Updated to work without backend - all operations happen client-side.
  */
 
+import { supabase } from '../lib/supabase';
+import { clientSideExtractTasks } from '../services/taskExtraction';
+import TasksService from '../services/tasksService';
+import TeamsService from '../services/teamsService';
+
 // ============================================================================
-// Types
+// Types  
 // ============================================================================
 
 export interface ExtractedTask {
@@ -55,6 +50,8 @@ export interface CreateTasksResponse {
     title: string;
     error: string;
   }[];
+  warnings?: string[];
+  data?: any[];
 }
 
 export interface Team {
@@ -72,6 +69,9 @@ export interface TeamMember {
   name: string;
   role: string;
   username?: string;
+  added_at: string;
+  email?: string;
+  status?: 'pending' | 'accepted' | 'rejected';
 }
 
 export interface UserProfile {
@@ -85,163 +85,95 @@ export interface UserProfile {
 // Configuration
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// No longer needed - all operations are client-side now!
 
 // ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Generic fetch wrapper with error handling
- */
-async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      // Include credentials for cookie-based auth (when Zoho OAuth is implemented)
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Full API Error Data:', errorData);
-      throw new Error(
-        errorData.message || errorData.error || `API error: ${response.status} ${response.statusText}`
-      );
-    }
-
-    return response.json();
-  } catch (error) {
-    // NOTE: In production, you might want to log this to an error tracking service
-    console.error(`API request failed: ${endpoint}`, error);
-    throw error;
-  }
-}
-
-// ============================================================================
-// API Methods
+// API Methods - Now Client-Side
 // ============================================================================
 
 /**
- * Extract tasks from meeting notes using AI
- * 
- * @param notes - Raw meeting notes text
- * @returns Structured list of extracted tasks
+ * Extract tasks from meeting notes using AI (client-side)
  */
-export async function extractTasks(notes: string): Promise<ExtractResponse> {
-  return apiFetch<ExtractResponse>('/extract', {
-    method: 'POST',
-    body: JSON.stringify({ notes }),
-  });
+export async function extractTasks(notes: string, teamMembers: any[] = []): Promise<ExtractResponse> {
+  return clientSideExtractTasks(notes, teamMembers);
 }
 
 /**
- * Create tasks in database
+ * Create tasks in database (client-side)
  */
 export async function createTasks(
   tasks: ExtractedTask[],
   teamId: string,
   assignedBy: string
 ): Promise<any> {
-  return apiFetch<any>('/tasks', {
-    method: 'POST',
-    body: JSON.stringify({ tasks, teamId, assignedBy }),
-  });
+  return TasksService.createTasks(tasks, teamId, assignedBy);
 }
 
 /**
- * Get tasks with filters
- */
-/**
- * Get tasks with filters
+ * Get tasks with filters (client-side)
  */
 export async function getTasks(filters: { userId?: string; teamId?: string; status?: string; deleted?: boolean }): Promise<any[]> {
-  const params = new URLSearchParams();
-  if (filters.userId) params.append('userId', filters.userId);
-  if (filters.teamId) params.append('teamId', filters.teamId);
-  if (filters.status) params.append('status', filters.status);
-  if (filters.deleted) params.append('deleted', 'true');
-
-  return apiFetch<any[]>(`/tasks?${params.toString()}`);
+  return TasksService.getTasks(filters);
 }
 
 /**
- * Update task status
- */
-/**
- * Update task status
+ * Update task status (client-side)
  */
 export async function updateTaskStatus(taskId: string, status: 'pending' | 'in-progress' | 'completed'): Promise<any> {
-  return apiFetch<any>(`/tasks/${taskId}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status }),
-  });
+  return TasksService.updateTaskStatus(taskId, status);
 }
 
 /**
- * Update task details
+ * Update task details (client-side)
  */
 export async function updateTask(taskId: string, updates: any): Promise<any> {
-  return apiFetch<any>(`/tasks/${taskId}`, {
-    method: 'PUT',
-    body: JSON.stringify(updates),
-  });
+  return TasksService.updateTask(taskId, updates);
 }
 
 /**
- * Delete a task
- * @param taskId - ID of the task to delete
- * @param force - If true, permanently delete the task. If false (default), soft delete.
+ * Delete a task (client-side)
  */
 export async function deleteTask(taskId: string, force: boolean = false): Promise<void> {
-  const url = force ? `/tasks/${taskId}?force=true` : `/tasks/${taskId}`;
-  return apiFetch<void>(url, {
-    method: 'DELETE',
-  });
+  return TasksService.deleteTask(taskId, force);
 }
 
 /**
- * Restore a soft-deleted task
+ * Restore a soft-deleted task (client-side)
  */
 export async function restoreTask(taskId: string): Promise<any> {
-  return apiFetch<any>(`/tasks/${taskId}/restore`, {
-    method: 'PATCH',
-  });
+  return TasksService.updateTaskStatus(taskId, 'pending');
 }
 
 /**
- * Get team statistics
+ * Get team members (client-side)
+ */
+export async function getTeamMembers(teamId: string): Promise<TeamMember[]> {
+  return TeamsService.getTeamMembers(teamId);
+}
+
+/**
+ * Get team statistics (client-side)
  */
 export async function getTeamStats(teamId: string): Promise<any> {
-  return apiFetch<any>(`/tasks/stats?teamId=${teamId}`);
+  return TeamsService.getTeamStats(teamId);
 }
 
 /**
- * Get user's teams
+ * Get user's teams (client-side)
  */
 export async function getTeams(userId: string): Promise<Team[]> {
-  return apiFetch<Team[]>(`/teams?userId=${userId}`);
+  return TeamsService.getTeams(userId);
 }
 
 /**
- * Create a new team
+ * Create a new team (client-side)
  */
 export async function createTeam(name: string, userId: string): Promise<Team> {
-  return apiFetch<Team>('/teams', {
-    method: 'POST',
-    body: JSON.stringify({ name, userId }),
-  });
+  return TeamsService.createTeam(name, userId);
 }
 
 /**
- * Add a member to a team
+ * Add a member to a team (client-side)
  */
 export async function addTeamMember(
   teamId: string,
@@ -249,52 +181,174 @@ export async function addTeamMember(
   addedBy: string,
   role: string = 'Member'
 ): Promise<TeamMember> {
-  return apiFetch<TeamMember>(`/teams/${teamId}/members`, {
-    method: 'POST',
-    body: JSON.stringify({ userId, addedBy, role }),
+  const result = await TeamsService.addTeamMembers(teamId, [userId], addedBy);
+  return result[0];
+}
+
+/**
+ * Send invitations to multiple users (client-side)
+ */
+export async function sendTeamInvitations(
+  teamId: string,
+  userIds: string[],
+  addedBy: string
+): Promise<any> {
+  return TeamsService.addTeamMembers(teamId, userIds, addedBy);
+}
+
+/**
+ * Get pending invitations for the current user (client-side)
+ */
+export async function getInvitations(): Promise<any[]> {
+  // console.log('getInvitations: Function called');
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  // console.log('getInvitations: Session retrieved:', session);
+
+  if (!session?.user) {
+    // console.log('getInvitations: No user in session, returning empty');
+    return [];
+  }
+
+  // console.log('getInvitations: User ID:', session.user.id);
+
+  const { data: members, error } = await supabase
+    .from('team_members')
+    .select(`
+      *,
+      teams:teams(*)
+    `)
+    .eq('user_id', session.user.id)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('getInvitations: Error:', error);
+    throw error;
+  }
+  // console.log('getInvitations: Raw members:', members);
+  if (!members || members.length === 0) return [];
+
+  // Fetch profiles for the 'added_by' users
+  const addedByIds = members.map(m => m.added_by).filter(id => id);
+  let profiles: any[] = [];
+  if (addedByIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, username')
+      .in('id', addedByIds);
+    profiles = profilesData || [];
+  }
+
+  // Map to the format NotificationCenter expects
+  return members.map(m => {
+    const inviter = profiles.find(p => p.id === m.added_by);
+    const inviterName = inviter?.full_name || inviter?.username || 'Unknown User';
+
+    return {
+      id: m.id,
+      team_id: m.team_id,
+      team_name: m.teams?.name || 'Unknown Team',
+      invited_by_name: inviterName,
+      created_at: m.added_at || new Date().toISOString()
+    };
   });
 }
 
 /**
- * Remove a member from a team
+ * Accept a team invitation (client-side)
+ */
+export async function acceptInvitation(teamId: string): Promise<any> {
+  // console.log('acceptInvitation: Called for team:', teamId);
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session?.user) throw new Error('Not authenticated');
+
+  // console.log('acceptInvitation: User ID:', session.user.id);
+
+  const { data: result, error } = await supabase
+    .from('team_members')
+    .update({ status: 'accepted' })
+    .eq('team_id', teamId)
+    .eq('user_id', session.user.id)
+    .select();
+
+  if (error) {
+    console.error('acceptInvitation: Error:', error);
+    throw error;
+  }
+
+  // console.log('acceptInvitation: Result:', result);
+
+  if (!result || result.length === 0) {
+    console.warn('acceptInvitation: No rows updated! Check RLS policies.');
+  }
+
+  return result;
+}
+
+/**
+ * Reject a team invitation (client-side)
+ */
+export async function rejectInvitation(teamId: string): Promise<any> {
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session?.user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('team_members')
+    .delete()
+    .eq('team_id', teamId)
+    .eq('user_id', session.user.id);
+
+  if (error) throw error;
+}
+
+/**
+ * Remove a member from a team (client-side)
  */
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
-  return apiFetch<void>(`/teams/${teamId}/members/${userId}`, {
-    method: 'DELETE',
-  });
+  const { error } = await supabase
+    .from('team_members')
+    .delete()
+    .eq('team_id', teamId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
 }
 
 /**
- * Search users
+ * Search users (client-side)
  */
 export async function searchUsers(query: string): Promise<UserProfile[]> {
-  return apiFetch<UserProfile[]>(`/users/search?q=${encodeURIComponent(query)}`);
+  return TasksService.searchUsers(query);
 }
 
 /**
- * Initiate Zoho OAuth flow
- * Redirects user to Zoho login page
- */
-export function initiateZohoAuth(): void {
-  // NOTE: This will redirect the entire page to the backend OAuth endpoint
-  // The backend handles the redirect to Zoho and callback flow
-  window.location.href = `${API_BASE_URL}/auth/zoho`;
-}
-
-/**
- * Check if user is authenticated with Zoho
- * 
- * TODO: Implement this endpoint on backend
- * For now, returns false (demo mode doesn't require auth)
+ * Check auth status - now always true since we use Supabase Auth directly
  */
 export async function checkAuthStatus(): Promise<boolean> {
-  try {
-    const response = await apiFetch<{ authenticated: boolean }>('/auth/status');
-    return response.authenticated;
-  } catch {
-    // If endpoint doesn't exist or fails, assume not authenticated
-    return false;
-  }
+  const { data: session } = await supabase.auth.getSession();
+  return !!session?.user;
+}
+
+// ============================================================================
+// Legacy API Functions (Deprecated but maintained for compatibility)
+// ============================================================================
+
+/**
+ * @deprecated - Direct fetch calls should use new client-side functions above
+ * This is a compatibility layer for components still using old API calls
+ */
+export const apiUrl = 'https://meetingmind-extracter.web.app/api';
+
+/**
+ * Helper function for legacy components that still make direct fetch calls
+ * This will be gradually phased out as components are updated
+ */
+export async function legacyFetch(endpoint: string, options: RequestInit = {}) {
+  // For now, redirect to show that API is client-side
+  console.warn(`[Deprecated] Direct API call to ${endpoint} - use client-side functions instead`);
+  throw new Error(`API endpoint ${endpoint} moved to client-side. Check console for details.`);
 }
 
 // ============================================================================
@@ -306,7 +360,7 @@ export async function checkAuthStatus(): Promise<boolean> {
  * Returns deterministic results based on input length
  */
 export function mockExtractTasks(notes: string): ExtractResponse {
-  console.log('[Mock Extractor] Starting extraction, input length:', notes.length);
+  // console.log('[Mock Extractor] Starting extraction, input length:', notes.length);
   const tasks: ExtractedTask[] = [];
 
   // Filler patterns to ignore
@@ -503,7 +557,7 @@ export function mockExtractTasks(notes: string): ExtractResponse {
     });
   }
 
-  console.log('[Mock Extractor] Completed, extracted', tasks.length, 'tasks');
+  // console.log('[Mock Extractor] Completed, extracted', tasks.length, 'tasks');
   return {
     tasks,
     metadata: {

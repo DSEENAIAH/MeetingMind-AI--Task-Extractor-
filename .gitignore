@@ -118,3 +118,4 @@ config/secrets.json
 # Backup files
 *.bak
 *.backup
+.vercel

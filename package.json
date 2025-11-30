@@ -1,0 +1,10 @@
+{
+    "name": "meetingmind-ai-monorepo",
+    "version": "1.0.0",
+    "scripts": {
+        "build": "cd frontend && npm install && npm run build"
+    },
+    "devDependencies": {
+        "vercel": "^32.0.0"
+    }
+}

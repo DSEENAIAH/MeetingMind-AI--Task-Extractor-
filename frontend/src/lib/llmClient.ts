@@ -11,32 +11,36 @@ import type { ExtractedTask, ExtractResponse } from '../types/index.js';
 let genAI: GoogleGenerativeAI | null = null;
 function getGenAI() {
   if (!genAI) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not set');
+      throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
     }
     genAI = new GoogleGenerativeAI(apiKey);
   }
   return genAI;
 }
 
-const EXTRACTION_PROMPT = `You are a JSON-only API. Extract tasks from the meeting transcript below.
+const EXTRACTION_PROMPT = `You are an expert Project Manager AI. Your goal is to extract actionable tasks from the meeting transcript below.
 
 Return ONLY a JSON object with this exact structure (no text before or after):
-{"tasks":[{"title":"Task name","description":"Details","assignee":"Name, Username, or Email or null","priority":"high|medium|low","dueDate":"YYYY-MM-DD or null","optional":false,"inferred":false,"confidence":"high","sourceText":"","evidenceContext":""}]}
+{"tasks":[{"title":"Actionable task title","description":"Detailed description including context","assignee":"Name or Username (best guess) or null","priority":"high|medium|low","dueDate":"YYYY-MM-DD or null","optional":false,"inferred":false,"confidence":"high|medium|low","sourceText":"Exact quote from text"}]}
 
-Rules:
-- Explicit tasks: Direct assignments ("John, do X") → inferred:false
-- Assignees: Prefer emails or @usernames if available, otherwise use full names.
-- Implied tasks: Suggestions ("someone should..."), questions ("can you...?") → inferred:true, add sourceText
-- Optional: "(optional)" keywords → optional:true
-- Skip: Past tense, descriptions without action
-
-Today: ${new Date().toISOString().split('T')[0]}
+Rules for Extraction:
+1.  **Identify Actionable Items**: Look for commitments ("I will...", "We need to..."), commands ("Please do...", "Fix this..."), and assigned responsibilities.
+2.  **Assignees**:
+    *   If a name is mentioned in context of doing something ("John will fix the bug"), assign to "John".
+    *   If a speaker says "I will do X", assign to that speaker.
+    *   If no clear assignee, set to null.
+3.  **Priorities**:
+    *   Urgent/Blocking/ASAP = "high"
+    *   Standard tasks = "medium"
+    *   "Nice to have" / "If time permits" = "low"
+4.  **Dates**: Extract specific dates if mentioned (e.g., "by Friday", "next Monday"). Convert relative dates to YYYY-MM-DD assuming Today is ${new Date().toISOString().split('T')[0]}.
+5.  **Inferred Tasks**: If a task is implied but not explicitly stated (e.g., "The documentation is outdated"), create a task (e.g., "Update documentation") and set "inferred": true.
 
 Meeting transcript:`;
 
-export async function extractTasksWithGemini(notes: string): Promise<ExtractResponse> {
+export async function extractTasksWithGemini(notes: string, teamMembers: any[] = []): Promise<ExtractResponse> {
   try {
     const model = getGenAI().getGenerativeModel({
       model: 'gemini-2.5-flash',
@@ -48,12 +52,19 @@ export async function extractTasksWithGemini(notes: string): Promise<ExtractResp
       },
     });
 
-    const result = await model.generateContent(`${EXTRACTION_PROMPT}\n\n${notes}`);
+    // Construct team context string
+    let teamContext = "";
+    if (teamMembers && teamMembers.length > 0) {
+      const memberNames = teamMembers.map(m => m.full_name || m.name || m.username).filter(Boolean).join(", ");
+      teamContext = `\n\nAvailable Team Members for Assignment: [${memberNames}]\nIMPORTANT: Try to assign tasks to these specific members if their names (or variations) appear in the text.`;
+    }
+
+    const result = await model.generateContent(`${EXTRACTION_PROMPT}${teamContext}\n\nMeeting transcript:\n${notes}`);
     const response = await result.response;
     const text = response.text();
 
-    console.log('[Gemini] Raw response length:', text.length);
-    console.log('[Gemini] Raw response preview:', text.substring(0, 1000));
+    // console.log('[Gemini] Raw response length:', text.length);
+    // console.log('[Gemini] Raw response preview:', text.substring(0, 1000));
 
     // Clean and parse JSON response with repair logic
     let jsonText = text.trim();
@@ -112,7 +123,7 @@ export async function extractTasksWithGemini(notes: string): Promise<ExtractResp
         }
 
         parsed = JSON.parse(jsonString);
-        console.log('[Gemini] JSON repaired successfully');
+        // console.log('[Gemini] JSON repaired successfully');
       } catch (repairError) {
         console.error('[Gemini] JSON repair failed');
         console.error('[Gemini] Original JSON (first 1000 chars):', jsonMatch[0].substring(0, 1000));
@@ -144,7 +155,7 @@ export async function extractTasksWithGemini(notes: string): Promise<ExtractResp
       };
     });
 
-    console.log(`[Gemini] Extracted ${tasks.length} tasks`);
+    // console.log(`[Gemini] Extracted ${tasks.length} tasks`);
 
     return {
       tasks,

@@ -17,6 +17,7 @@
 
 import { Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import PasteNotes from './pages/PasteNotes';
+import PreviewTasks from './pages/PreviewTasks';
 
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -29,6 +30,7 @@ import { useAuth } from './contexts/AuthContext';
 import { FiLogOut, FiUser } from 'react-icons/fi';
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
+import NotificationCenter from './components/NotificationCenter';
 
 function App() {
   const location = useLocation();
@@ -39,7 +41,7 @@ function App() {
 
   const handleSignOut = async () => {
     setIsLoggingOut(true);
-    console.log('Sign out clicked');
+    // console.log('Sign out clicked');
 
     try {
       // Set a timeout to force logout if Supabase takes too long
@@ -50,9 +52,9 @@ function App() {
       const signOutPromise = supabase.auth.signOut();
 
       await Promise.race([signOutPromise, timeoutPromise]);
-      console.log('Signed out successfully');
+      // console.log('Signed out successfully');
     } catch (error) {
-      console.log('Sign out error or timeout:', error);
+      // console.log('Sign out error or timeout:', error);
       // Continue anyway
     }
 
@@ -73,8 +75,8 @@ function App() {
         return;
       }
 
-      console.log('Fetching username for user:', user.id);
-      console.log('User metadata:', user.user_metadata);
+      // console.log('Fetching username for user:', user.id);
+      // console.log('User metadata:', user.user_metadata);
 
       // Use metadata directly (fallback since database query seems to hang)
       const displayName = user.user_metadata?.full_name ||
@@ -82,7 +84,7 @@ function App() {
         user.email?.split('@')[0] ||
         'User';
 
-      console.log('Setting username to:', displayName);
+      // console.log('Setting username to:', displayName);
       setUsername(displayName);
 
       // Try to fetch from database in background (don't wait)
@@ -92,12 +94,12 @@ function App() {
         .eq('id', user.id)
         .maybeSingle()
         .then(({ data, error }) => {
-          console.log('Database query completed');
-          console.log('User profile data:', data);
-          console.log('Query error:', error);
+          // console.log('Database query completed');
+          // console.log('User profile data:', data);
+          // console.log('Query error:', error);
 
           if (data && !error && data.full_name) {
-            console.log('Updating to database name:', data.full_name);
+            // console.log('Updating to database name:', data.full_name);
             setUsername(data.full_name);
           }
         })
@@ -136,6 +138,7 @@ function App() {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-8">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 bg-clip-text text-transparent">
+                  MeetingMind
                 </h1>
                 {/* Only show navigation for officials */}
                 {isOfficial && (
@@ -149,13 +152,15 @@ function App() {
                     >
                       Teams
                     </Link>
-
                   </nav>
                 )}
               </div>
 
               {/* User Menu - Profile Display and Sign Out */}
               <div className="flex items-center space-x-3">
+                {/* Notification Center */}
+                <NotificationCenter />
+
                 {/* Profile Icon with Name - Clickable Link */}
                 <Link to="/profile" className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors">
                   <FiUser className="w-5 h-5 text-gray-600" />
@@ -198,6 +203,14 @@ function App() {
             element={
               <ProtectedRoute>
                 {isOfficial ? <PasteNotes /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/preview"
+            element={
+              <ProtectedRoute>
+                <PreviewTasks />
               </ProtectedRoute>
             }
           />

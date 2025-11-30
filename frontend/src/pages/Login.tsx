@@ -174,8 +174,8 @@ export default function Login() {
             {/* Sign In Form - RIGHT side by default */}
             <div
               className={`absolute right-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${isSignUp
-                  ? 'opacity-0 pointer-events-none z-0'
-                  : 'opacity-100 pointer-events-auto z-20'
+                ? 'opacity-0 pointer-events-none z-0'
+                : 'opacity-100 pointer-events-auto z-20'
                 }`}
             >
               <div className="w-full max-w-sm mx-auto">
@@ -285,8 +285,8 @@ export default function Login() {
             {/* Sign Up Form - LEFT side */}
             <div
               className={`absolute left-0 w-full md:w-1/2 h-full p-8 md:p-12 bg-white flex items-center transition-all duration-700 ease-in-out ${!isSignUp
-                  ? 'opacity-0 pointer-events-none z-0'
-                  : 'opacity-100 pointer-events-auto z-20'
+                ? 'opacity-0 pointer-events-none z-0'
+                : 'opacity-100 pointer-events-auto z-20'
                 }`}
             >
               <div className="w-full max-w-sm mx-auto">
@@ -435,8 +435,8 @@ export default function Login() {
             {/* Curved Wave Panel - Slides between left and right */}
             <div
               className={`absolute top-0 bottom-0 w-full md:w-1/2 transition-all duration-700 ease-in-out z-10 ${isSignUp
-                  ? 'md:right-0 md:left-auto'
-                  : 'md:left-0 md:right-auto'
+                ? 'md:right-0 md:left-auto'
+                : 'md:left-0 md:right-auto'
                 }`}
             >
               {/* Curved SVG Shape */}

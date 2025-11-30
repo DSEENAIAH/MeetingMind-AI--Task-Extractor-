@@ -1,22 +1,7 @@
-/**
- * TaskRow.tsx
- * 
- * Purpose: Individual task component for preview/editing.
- * 
- * Features:
- * - Inline editing of task fields (title, description, priority, assignee)
- * - Remove button to delete tasks from preview
- * - Clean, accessible UI with proper ARIA labels
- * - Priority badge with color coding
- * 
- * Design decisions:
- * - Keep editing simple: click to edit, blur to save
- * - Visual feedback for required fields
- * - Confirmation before removal (via button color/icon)
- */
 
 import { useState } from 'react';
 import { ExtractedTask } from '../api/apiClient';
+import { FiEdit2, FiTrash2, FiCheck, FiUser, FiFlag } from 'react-icons/fi';
 
 interface TeamMember {
   id: string;
@@ -28,13 +13,11 @@ interface TeamMember {
 interface TaskRowProps {
   task: ExtractedTask;
   teamMembers?: TeamMember[];
-  selected?: boolean;
-  onSelect?: (selected: boolean) => void;
   onUpdate: (task: ExtractedTask) => void;
   onRemove: () => void;
 }
 
-function TaskRow({ task, teamMembers = [], selected = false, onSelect, onUpdate, onRemove }: TaskRowProps) {
+function TaskRow({ task, teamMembers = [], onUpdate, onRemove }: TaskRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState(task);
 
@@ -43,476 +26,177 @@ function TaskRow({ task, teamMembers = [], selected = false, onSelect, onUpdate,
     setIsEditing(false);
   };
 
+  const handleCancel = () => {
+    setEditedTask(task);
+    setIsEditing(false);
+  };
+
   const priorityColors = {
-    low: 'bg-gray-100 text-gray-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-red-100 text-red-800',
+    low: 'bg-blue-50 text-blue-700 border-blue-100',
+    medium: 'bg-orange-50 text-orange-700 border-orange-100',
+    high: 'bg-red-50 text-red-700 border-red-100',
   };
 
   // Find assignee name if ID is stored, or just use the string
   const getAssigneeDisplay = () => {
-    if (!task.assignee) return null;
+    if (!task.assignee) return <span className="text-gray-400 italic">Unassigned</span>;
+
     // If assignee matches a member ID, show their name
     const member = teamMembers.find(m => m.id === task.assignee || m.username === task.assignee || m.full_name === task.assignee);
     return member ? member.full_name : task.assignee;
   };
 
-  return (
-    <div
-      className={`p-6 transition-all border-l-4 ${selected ? 'bg-blue-50 border-blue-500' : 'bg-white hover:bg-gray-50 border-transparent hover:border-gray-200'
-        }`}
-      data-testid="task-row"
-    >
-      <div className="flex items-start gap-4">
-        {/* Checkbox */}
-        <div className="pt-1">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={(e) => onSelect && onSelect(e.target.checked)}
-            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-          />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          {/* Title */}
-          {isEditing ? (
+  if (isEditing) {
+    return (
+      <div className="p-4 bg-blue-50/50 border-l-4 border-blue-500 transition-all">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Title</label>
             <input
               type="text"
               value={editedTask.title}
               onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 font-medium"
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-gray-900 shadow-sm"
               placeholder="Task title"
-              aria-label="Task title"
+              autoFocus
             />
-          ) : (
-            <h4 className="text-lg font-medium text-gray-900 mb-2">{task.title}</h4>
-          )}
+          </div>
 
-          {/* Description */}
-          {isEditing ? (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Description</label>
             <textarea
               value={editedTask.description}
               onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-              className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-600 shadow-sm resize-y"
               rows={3}
               placeholder="Task description"
-              aria-label="Task description"
             />
-          ) : (
-            <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-          )}
-
-          {/* Metadata: Priority, Assignee, Due Date */}
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            {/* Priority */}
-            {isEditing ? (
-              <select
-                value={editedTask.priority || 'medium'}
-                onChange={(e) =>
-                  setEditedTask({
-                    ...editedTask,
-                    priority: e.target.value as 'low' | 'medium' | 'high',
-                  })
-                }
-                className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                aria-label="Task priority"
-              >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-              </select>
-            ) : (
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityColors[task.priority || 'medium']
-                  }`}
-              >
-                {(task.priority || 'medium').toUpperCase()}
-              </span>
-            )}
-
-            {/* Assignee */}
-            {isEditing ? (
-              teamMembers.length > 0 ? (
-                <select
-                  value={editedTask.assignee || ''}
-                  onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
-                  className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                  aria-label="Task assignee"
-                >
-                  <option value="">Unassigned</option>
-                  {teamMembers.map(member => (
-                    <option key={member.id} value={member.id}>
-                      {member.full_name} (@{member.username})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={editedTask.assignee || ''}
-                  onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
-                  className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                  placeholder="Assignee (optional)"
-                  aria-label="Task assignee"
-                />
-              )
-            ) : (
-              (task.matchedUser || task.assignee) && (
-                <span className={`inline-flex items-center ${!task.matchedUser && teamMembers.length > 0 && !teamMembers.find(m => m.id === task.assignee || m.username === task.assignee || m.full_name === task.assignee)
-                  ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded'
-                  : 'text-gray-600'
-                  }`}>
-                  {task.matchedUser ? (
-                    <div className="flex items-center">
-                      <div className="flex items-center gap-1.5 mr-1">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-700">
-                          {task.matchedUser.full_name.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-medium text-gray-900">{task.matchedUser.full_name}</span>
-                      </div>
-
-                      {/* Check if matched user is in the team */}
-                      {teamMembers.length > 0 && !teamMembers.some(m => m.id === task.matchedUser?.id) && (
-                        <div className="flex items-center ml-2 text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-xs">
-                          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          <span className="font-medium">Not in team</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-4 h-4 mr-1"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                      {getAssigneeDisplay()}
-                    </>
-                  )}
-
-                  {!task.matchedUser && teamMembers.length > 0 && !teamMembers.find(m => m.id === task.assignee || m.username === task.assignee || m.full_name === task.assignee) && (
-                    <span className="ml-1 text-xs font-bold" title="User not in team">(?)</span>
-                  )}
-                </span>
-              )
-            )}
-
-            {/* Due Date */}
-            {isEditing ? (
-              <input
-                type="date"
-                value={editedTask.dueDate || ''}
-                onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value })}
-                className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                aria-label="Task due date"
-              />
-            ) : (
-              task.dueDate && (
-                <span className="inline-flex items-center text-gray-600">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  {new Date(task.dueDate).toLocaleDateString()}
-                </span>
-              )
-            )}
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="ml-4 flex items-center space-x-2">
-          {isEditing ? (
-            <>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-                aria-label="Save task"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditedTask(task);
-                  setIsEditing(false);
-                }}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                aria-label="Cancel editing"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                aria-label="Edit task"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={onRemove}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                aria-label="Remove task"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </button>
-              ```
-              className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              aria-label="Task priority"
-              >
-              <option value="low">Low Priority</option>
-              <option value="medium">Medium Priority</option>
-              <option value="high">High Priority</option>
-            </select>
-          ) : (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityColors[task.priority || 'medium']
-              }`}
-          >
-            {(task.priority || 'medium').toUpperCase()}
-          </span>
-            )}
-
-          {/* Assignee */}
-          {isEditing ? (
-            teamMembers.length > 0 ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Assignee</label>
               <select
-                value={editedTask.assignee || ''}
-                onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
-                className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                aria-label="Task assignee"
+                value={editedTask.matchedUser?.id || (teamMembers.find(m => m.id === editedTask.assignee)?.id) || ''}
+                onChange={(e) => {
+                  const selectedMemberId = e.target.value;
+                  const member = teamMembers.find(m => m.id === selectedMemberId);
+                  if (member) {
+                    setEditedTask({
+                      ...editedTask,
+                      assignee: member.id,
+                      matchedUser: {
+                        id: member.id,
+                        username: member.username,
+                        full_name: member.full_name,
+                        role: member.role
+                      }
+                    });
+                  } else {
+                    // Unassigned
+                    setEditedTask({
+                      ...editedTask,
+                      assignee: '',
+                      matchedUser: undefined
+                    });
+                  }
+                }}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-700 shadow-sm"
               >
                 <option value="">Unassigned</option>
                 {teamMembers.map(member => (
                   <option key={member.id} value={member.id}>
-                    {member.full_name} (@{member.username})
+                    {member.full_name} ({member.role})
                   </option>
                 ))}
               </select>
-            ) : (
-              <input
-                type="text"
-                value={editedTask.assignee || ''}
-                onChange={(e) => setEditedTask({ ...editedTask, assignee: e.target.value })}
-                className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                placeholder="Assignee (optional)"
-                aria-label="Task assignee"
-              />
-            )
-          ) : (
-            (task.matchedUser || task.assignee) && (
-              <span className={`inline-flex items-center ${!task.matchedUser && teamMembers.length > 0 && !teamMembers.find(m => m.id === task.assignee || m.username === task.assignee || m.full_name === task.assignee)
-                ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded'
-                : 'text-gray-600'
-                }`}>
-                {task.matchedUser ? (
-                  <div className="flex items-center">
-                    <div className="flex items-center gap-1.5 mr-1">
-                      <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-700">
-                        {task.matchedUser.full_name.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="font-medium text-gray-900">{task.matchedUser.full_name}</span>
-                    </div>
+            </div>
 
-                    {/* Check if matched user is in the team */}
-                    {teamMembers.length > 0 && !teamMembers.some(m => m.id === task.matchedUser?.id) && (
-                      <div className="flex items-center ml-2 text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-xs">
-                        <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span className="font-medium">Not in team</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4 mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    {getAssigneeDisplay()}
-                  </>
-                )}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Priority</label>
+              <select
+                value={editedTask.priority || 'medium'}
+                onChange={(e) => setEditedTask({ ...editedTask, priority: e.target.value as any })}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-700 shadow-sm"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
 
-                {!task.matchedUser && teamMembers.length > 0 && !teamMembers.find(m => m.id === task.assignee || m.username === task.assignee || m.full_name === task.assignee) && (
-                  <span className="ml-1 text-xs font-bold" title="User not in team">(?)</span>
-                )}
-              </span>
-            )
-          )}
-
-          {/* Due Date */}
-          {isEditing ? (
-            <input
-              type="date"
-              value={editedTask.dueDate || ''}
-              onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value })}
-              className="px-3 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              aria-label="Task due date"
-            />
-          ) : (
-            task.dueDate && (
-              <span className="inline-flex items-center text-gray-600">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                {new Date(task.dueDate).toLocaleDateString()}
-              </span>
-            )
-          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors flex items-center gap-1"
+            >
+              <FiCheck className="w-4 h-4" /> Save Changes
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Action Buttons */}
-      <div className="ml-4 flex items-center space-x-2">
-        {isEditing ? (
-          <>
+  return (
+    <li className="group hover:bg-gray-50 transition-colors duration-150">
+      <div className="p-4 sm:px-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-1">
+              <h4 className="text-base font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                {task.title}
+              </h4>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${priorityColors[task.priority || 'medium']}`}>
+                {task.priority || 'medium'}
+              </span>
+            </div>
+
+            <p className="text-sm text-gray-500 line-clamp-2 mb-3">
+              {task.description}
+            </p>
+
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5">
+                <FiUser className="w-3.5 h-3.5 text-gray-400" />
+                <span className="font-medium text-gray-700">{getAssigneeDisplay()}</span>
+              </div>
+              {task.dueDate && (
+                <div className="flex items-center gap-1.5">
+                  <FiFlag className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              type="button"
-              onClick={handleSave}
-              className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors"
-              aria-label="Save task"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditedTask(task);
-                setIsEditing(false);
-              }}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-              aria-label="Cancel editing"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
               onClick={() => setIsEditing(true)}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-              aria-label="Edit task"
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Edit Task"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
+              <FiEdit2 className="w-4 h-4" />
             </button>
             <button
-              type="button"
               onClick={onRemove}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-              aria-label="Remove task"
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Remove Task"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <FiTrash2 className="w-4 h-4" />
             </button>
-          </>
-        )}
+          </div>
+        </div>
       </div>
-    </div>
-    </div >
+    </li>
   );
 }
 
 export default TaskRow;
-```

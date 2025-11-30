@@ -1,0 +1,25 @@
+{
+    "manifestVersion": "1.0",
+    "id": "meetingmind_ai",
+    "version": "1.0.0",
+    "name": "MeetingMind AI",
+    "description": "Extract actionable tasks from your meeting notes instantly using AI.",
+    "icons": {
+        "16": "assets/icon16.png",
+        "64": "assets/icon64.png",
+        "128": "assets/icon128.png"
+    },
+    "commands": [
+        {
+            "name": "/meetingmind",
+            "description": "Extract tasks from meeting notes",
+            "hint": "Paste your meeting notes here...",
+            "access": "everyone",
+            "handler": {
+                "type": "webhook",
+                "url": "https://meeting-mind-ai-dseenaiahs-projects.vercel.app/cliq/command"
+            }
+        }
+    ],
+    "permissions": []
+}

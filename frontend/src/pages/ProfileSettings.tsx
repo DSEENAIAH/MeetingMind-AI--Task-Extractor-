@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { FiUser, FiLock, FiSave, FiCheck, FiArrowLeft, FiShield, FiEye, FiEyeOff, FiEdit2, FiX } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,17 +40,17 @@ const ProfileSettings = () => {
     const fetchProfile = async () => {
         try {
             setLoadingProfile(true);
-            const response = await fetch('http://localhost:5000/api/users/me', {
-                headers: {
-                    'Authorization': 'Bearer mock-token',
-                    'x-user-id': user?.id || ''
-                }
-            });
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .select('username, full_name, role')
+                .eq('id', user?.id)
+                .single();
 
-            if (response.ok) {
-                const data = await response.json();
+            if (error) {
+                console.error('Error fetching profile:', error);
+            } else {
                 setFullName(data.full_name || '');
-                setEmail(data.email || '');
+                setEmail(user?.email || '');
                 setUsername(data.username || '');
                 setRole(data.role || '');
             }
@@ -66,23 +67,23 @@ const ProfileSettings = () => {
         setProfileMessage(null);
 
         try {
-            const response = await fetch('http://localhost:5000/api/users/me', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer mock-token',
-                    'x-user-id': user?.id || ''
-                },
-                body: JSON.stringify({ full_name: fullName })
-            });
+            const { error } = await supabase
+                .from('user_profiles')
+                .update({ 
+                    full_name: fullName,
+                    username: username,
+                    role: role,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', user?.id);
 
-            if (response.ok) {
+            if (error) {
+                setProfileMessage({ type: 'error', text: error.message || 'Failed to update profile' });
+            } else {
                 setProfileMessage({ type: 'success', text: 'Profile updated successfully' });
                 setIsEditing(false);
                 // Clear success message after 3 seconds
                 setTimeout(() => setProfileMessage(null), 3000);
-            } else {
-                setProfileMessage({ type: 'error', text: 'Failed to update profile' });
             }
         } catch (error) {
             setProfileMessage({ type: 'error', text: 'Error updating profile' });
@@ -106,29 +107,19 @@ const ProfileSettings = () => {
         setPasswordMessage(null);
 
         try {
-            const response = await fetch('http://localhost:5000/api/users/password', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer mock-token',
-                    'x-user-id': user?.id || ''
-                },
-                body: JSON.stringify({
-                    password: newPassword,
-                    currentPassword: currentPassword
-                })
+            const { error } = await supabase.auth.updateUser({
+                password: newPassword
             });
 
-            if (response.ok) {
+            if (error) {
+                setPasswordMessage({ type: 'error', text: error.message || 'Failed to update password' });
+            } else {
                 setPasswordMessage({ type: 'success', text: 'Password updated successfully' });
                 setCurrentPassword('');
                 setNewPassword('');
                 setConfirmPassword('');
                 // Clear success message after 3 seconds
                 setTimeout(() => setPasswordMessage(null), 3000);
-            } else {
-                const data = await response.json();
-                setPasswordMessage({ type: 'error', text: data.error || 'Failed to update password' });
             }
         } catch (error) {
             setPasswordMessage({ type: 'error', text: 'Error updating password' });

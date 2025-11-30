@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (event === 'SIGNED_IN' && session?.user) {
         // We'll handle profile creation in the component or via trigger
         // to avoid complex logic here that might crash
-        console.log('User signed in:', session.user.id);
+        // console.log('User signed in:', session.user.id);
       }
     });
 
